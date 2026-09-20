@@ -410,18 +410,19 @@ export default function MembershipPage() {
           overflow: "hidden",
         }}>
           <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 20% 50%, rgba(255,255,255,0.05) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(200,151,58,0.12) 0%, transparent 50%)", pointerEvents: "none" }} />
+          {/* Back button — top-left */}
+          <div style={{ position: "absolute", top: "1rem", left: "1rem", zIndex: 2 }}>
+            <BackButton style={{ color: "#fff", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)" }} />
+          </div>
           <div style={{ position: "relative", maxWidth: "600px", margin: "0 auto" }}>
             <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.15)", borderRadius: "20px", padding: "0.25rem 0.875rem", marginBottom: "1.25rem", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)" }}>
               <Crown size={13} style={{ color: "#E8C060" }} />
               <span style={{ color: "#fff", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.04em" }}>PREMIUM MEMBERSHIP</span>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.875rem" }}>
-              <BackButton style={{ color: "#fff", background: "rgba(255,255,255,0.1)" }} />
-              <h1 style={{ color: "#fff", fontSize: "clamp(1.5rem, 4vw, 2.25rem)", fontWeight: 900, lineHeight: 1.2, margin: 0 }}>
-                Find Your Perfect<br />Tamil Match Faster
-              </h1>
-            </div>
-            <p style={{ color: "rgba(255,255,255,0.85)", fontSize: "1rem", lineHeight: 1.6 }}>
+            <h1 style={{ color: "#fff", fontSize: "clamp(1.5rem, 4vw, 2.25rem)", fontWeight: 900, lineHeight: 1.2, margin: "0 0 0.875rem" }}>
+              Find Your Perfect<br />Tamil Match Faster
+            </h1>
+            <p style={{ color: "rgba(255,255,255,0.85)", fontSize: "1rem", lineHeight: 1.6, margin: 0 }}>
               Unlock unlimited phone numbers, verified profiles, and direct messaging.
             </p>
           </div>

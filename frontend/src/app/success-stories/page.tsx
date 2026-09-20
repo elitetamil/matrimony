@@ -49,6 +49,16 @@ const DEFAULT_STORIES: SuccessStory[] = [
 export default function SuccessStoriesPage() {
   const [stories, setStories] = useState<SuccessStory[]>([]);
   const [loading, setLoading] = useState(true);
+  const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpandedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   useEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: "instant" });
@@ -240,19 +250,30 @@ export default function SuccessStoriesPage() {
                           fontSize: "0.9375rem",
                           color: "#222222",
                           lineHeight: 1.6,
-                          margin: "0 0 1rem",
+                          margin: "0 0 0.75rem",
                           fontFamily: "var(--font-sans)",
-                          display: "-webkit-box",
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: "vertical",
-                          overflow: "hidden",
+                          ...(expandedIds.has(story.id) ? {} : {
+                            display: "-webkit-box",
+                            WebkitLineClamp: 3,
+                            WebkitBoxOrient: "vertical",
+                            overflow: "hidden",
+                          }),
                         }}
                       >
-                        {story.story}{" "}
-                        <span style={{ color: "#E67E22", fontWeight: 700, cursor: "pointer", marginLeft: "2px" }}>
-                          More...
-                        </span>
+                        {story.story}
                       </p>
+                      <button
+                        onClick={() => toggleExpand(story.id)}
+                        style={{
+                          background: "none", border: "none", padding: 0,
+                          color: "#6B1A2A", fontWeight: 700, fontSize: "0.8125rem",
+                          cursor: "pointer", fontFamily: "var(--font-sans)",
+                          marginBottom: "0.5rem",
+                          textDecoration: "underline",
+                        }}
+                      >
+                        {expandedIds.has(story.id) ? "Show less" : "Read more..."}
+                      </button>
 
                       {/* Location & Rating Stars */}
                       <div

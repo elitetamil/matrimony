@@ -158,23 +158,36 @@ function NotificationsContent() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#FFF8F0", minHeight: "100vh" }}>
-        <div style={{ maxWidth: "780px", margin: "0 auto", padding: "1rem 0.875rem 4rem" }}>
+      <main style={{ background: "#f2f2f2", height: "calc(100vh - 64px)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            maxWidth: "1100px",
+            width: "100%",
+            margin: "0 auto",
+            padding: "0.75rem",
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            overflowY: "auto",
+            overflowX: "hidden",
+            paddingRight: "2px",
+            paddingBottom: "2rem"
+          }}
+        >
           {/* Header */}
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.25rem" }}>
-            <div style={{ display: "flex", gap: "0.5rem" }}>
+          <div style={{ position: "sticky", top: "-0.75rem", zIndex: 10, background: "#f2f2f2", paddingTop: "0.75rem", paddingBottom: "0.75rem", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.5rem", flexWrap: "wrap", gap: "0.5rem" }}>
+            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", flex: 1 }}>
               <BackButton />
               <div>
-                <h1 style={{ fontSize: "1.375rem", fontWeight: 700, color: "#6B1A2A", margin: 0, fontFamily: "var(--font-sans)" }}>
-                Notifications
-              </h1>
-              {unreadCount > 0 && (
-                <span style={{ fontSize: "0.8125rem", color: "#777", marginTop: "2px", display: "block" }}>
-                  You have{" "}
-                  <strong style={{ color: "#6B1A2A" }}>{unreadCount}</strong> unread notifications
-                </span>
-              )}
-            </div>
+                <h1 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#111", margin: 0, fontFamily: "var(--font-sans)" }}>
+                  Alerts
+                </h1>
+                {unreadCount > 0 && (
+                  <span style={{ fontSize: "0.8125rem", color: "#666", marginTop: "2px", display: "block" }}>
+                    You have <strong style={{ color: "#111" }}>{unreadCount}</strong> unread alerts
+                  </span>
+                )}
+              </div>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
@@ -211,8 +224,9 @@ function NotificationsContent() {
           {/* Filter tabs */}
           <div style={{
             display: "flex", background: "#fff",
-            border: "1px solid #E8D5B7", borderRadius: "6px",
+            border: "1px solid #e0e0e0", borderRadius: "6px",
             overflow: "hidden", marginBottom: "1rem",
+            boxShadow: "0 1px 2px rgba(0,0,0,0.02)"
           }}>
             {(["all", "unread"] as const).map((f) => (
               <button
@@ -353,7 +367,6 @@ function NotificationsContent() {
           )}
         </div>
       </main>
-      <Footer />
     </>
   );
 }

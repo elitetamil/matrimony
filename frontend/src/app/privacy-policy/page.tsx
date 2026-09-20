@@ -446,8 +446,8 @@ export default function PrivacyPolicyPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "1.5rem 0 4rem" }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1.25rem" }}>
+      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "1.5rem 0 4rem", overflowX: "hidden" }}>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1.25rem", boxSizing: "border-box" }}>
           {/* Back Button */}
           <div style={{ marginBottom: "1rem" }}>
             <BackButton style={{ background: "#fff", border: "1px solid #E5D5C5", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }} />

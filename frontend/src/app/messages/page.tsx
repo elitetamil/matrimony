@@ -341,82 +341,63 @@ function MessagesContent() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#FFF8F0", minHeight: "100vh", paddingTop: "1rem", paddingBottom: "1rem" }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "0 0.75rem" }}>
 
-          <div style={{ display: "flex", alignItems: "center", marginBottom: "0.75rem", gap: "0.5rem" }}>
-            <BackButton />
-            <h1 style={{ fontSize: "1.375rem", fontWeight: 700, color: "#6B1A2A", margin: 0, fontFamily: "var(--font-sans)" }}>Messages</h1>
-          </div>
-
-          {/* Search bar — visible only in list view on mobile */}
-          <div style={{
-            marginBottom: "0.75rem",
-            display: showChatOnMobile ? "none" : "flex",
-            alignItems: "center",
-            gap: "0.75rem",
+      <main style={{ background: "#f2f2f2", height: "calc(100vh - 64px)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            maxWidth: "1100px",
+            width: "100%",
+            margin: "0 auto",
+            padding: "0.75rem",
+            display: "flex",
+            gap: "1rem",
+            alignItems: "stretch",
+            flex: 1,
+            overflow: "hidden",
           }}
-            className="messages-search"
-          >
-            <div style={{ position: "relative", flex: 1 }}>
-              <Search size={15} style={{ position: "absolute", left: "0.875rem", top: "50%", transform: "translateY(-50%)", color: "#aaa" }} />
-              <input
-                type="text"
-                placeholder="Search conversations…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  width: "100%", background: "#fff", border: "1px solid #E8D5B7", borderRadius: "20px",
-                  padding: "0.625rem 0.875rem 0.625rem 2.75rem", fontSize: "1rem",
-                  fontFamily: "var(--font-sans)", outline: "none", boxSizing: "border-box",
-                  minHeight: "44px",
-                }}
-              />
-            </div>
-          </div>
+        >
 
-          {/* Always-visible search on desktop */}
-          <div className="messages-search-desktop" style={{ marginBottom: "0.75rem" }}>
-            <div style={{ position: "relative", flex: 1, maxWidth: "320px" }}>
-              <Search size={15} style={{ position: "absolute", left: "0.875rem", top: "50%", transform: "translateY(-50%)", color: "#aaa" }} />
-              <input
-                type="text"
-                placeholder="Search conversations…"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  width: "100%", background: "#fff", border: "1px solid #E8D5B7", borderRadius: "20px",
-                  padding: "0.625rem 0.875rem 0.625rem 2.75rem", fontSize: "1rem",
-                  fontFamily: "var(--font-sans)", outline: "none", boxSizing: "border-box",
-                  minHeight: "44px",
-                }}
-              />
-            </div>
-          </div>
-
-          <div style={{ display: "flex", gap: "1rem", alignItems: "flex-start" }}>
-            {/* ── LEFT SIDEBAR: conversation list ── */}
+          {/* ── LEFT SIDEBAR: conversation list ── */}
             <aside
               style={{
-                width: "100%",
-                flexShrink: 0,
+                width: "268px", flexShrink: 0,
                 background: "#fff",
-                border: "1px solid #E8D5B7",
-                borderRadius: "12px",
-                overflow: "hidden",
-                boxShadow: "0 1px 3px rgba(107,26,42,0.08)",
-                // Mobile: hide if chat open
+                border: "1px solid #e0e0e0",
+                borderRadius: "6px",
+                overflowY: "auto",
+                overscrollBehavior: "contain",
+                alignSelf: "flex-start",
+                height: "100%",
                 display: showChatOnMobile ? "none" : "block",
               }}
               className="messages-conv-list"
             >
-              {/* Header */}
-              <div style={{ padding: "0.875rem 1rem", borderBottom: "1px solid #F2E8D6", background: "#6B1A2A" }}>
-                <span style={{ fontWeight: 700, fontSize: "0.9375rem", color: "#fff" }}>Messages</span>
+              {/* Sidebar Header */}
+              <div style={{ padding: "0.875rem 1rem", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
+                <BackButton />
+                <span style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#111" }}>Conversations</span>
+              </div>
+              
+              {/* Sidebar search */}
+              <div style={{ padding: "0.75rem", borderBottom: "1px solid #F2E8D6" }}>
+                <div style={{ position: "relative" }}>
+                  <Search size={14} style={{ position: "absolute", left: "0.75rem", top: "50%", transform: "translateY(-50%)", color: "#aaa" }} />
+                  <input
+                    type="text"
+                    placeholder="Search conversations…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{
+                      width: "100%", background: "#f9f9f9", border: "1px solid #E8D5B7", borderRadius: "20px",
+                      padding: "0.5rem 0.75rem 0.5rem 2.25rem", fontSize: "0.875rem",
+                      fontFamily: "var(--font-sans)", outline: "none", boxSizing: "border-box",
+                    }}
+                  />
+                </div>
               </div>
 
               {/* Conversation list */}
-              <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 200px)" }}>
+              <div style={{ overflowY: "auto", flex: 1 }}>
                 {loadingConvs ? (
                   <div style={{ padding: "1.5rem", textAlign: "center", color: "#aaa", fontSize: "0.875rem" }}>
                     Loading conversations…
@@ -458,20 +439,18 @@ function MessagesContent() {
                 display: "flex",
                 flexDirection: "column",
                 background: "#fff",
-                border: "1px solid #E8D5B7",
-                borderRadius: "12px",
+                border: "1px solid #e0e0e0",
+                borderRadius: "6px",
                 overflow: "hidden",
-                boxShadow: "0 1px 3px rgba(107,26,42,0.08)",
-                minHeight: "calc(100vh - 160px)",
-                // Mobile: take full width, hide if no chat selected
-                width: "100%",
               }}
               className="messages-chat-panel"
             >
               {!selectedId ? (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem 1rem" }}>
                   <MessageCircle size={48} style={{ color: "#E8D5B7", marginBottom: "1rem" }} />
-                  <h2 style={{ color: "#6B1A2A", fontWeight: 700, fontSize: "1.125rem", marginBottom: "0.5rem", textAlign: "center" }}>Your Messages</h2>
+                  <h2 style={{ color: "#6B1A2A", fontWeight: 700, fontSize: "1.125rem", marginBottom: "0.5rem", textAlign: "center" }}>
+                    Your Messages
+                  </h2>
                   <p style={{ color: "#888", fontSize: "0.875rem", textAlign: "center", maxWidth: "280px", lineHeight: 1.6 }}>
                     Select a conversation to start chatting. Premium members can initiate conversations.
                   </p>
@@ -669,32 +648,22 @@ function MessagesContent() {
               )}
             </div>
           </div>
-        </div>
       </main>
 
-      {/* Mobile-specific styles */}
       <style>{`
-        /* Desktop: show both panels */
         @media (min-width: 768px) {
           .messages-conv-list {
-            display: block !important;
-            width: 300px !important;
-            flex-shrink: 0;
+            width: 268px !important;
           }
           .messages-chat-panel {
             display: flex !important;
           }
-          .messages-search { display: flex !important; }
-          .messages-search-desktop { display: none; }
-          .messages-back-btn { display: none !important; }
         }
-        @media (min-width: 1024px) {
-          .messages-conv-list { width: 320px !important; }
-        }
+        
         /* Mobile: toggle between list and chat */
         @media (max-width: 767px) {
-          .messages-search-desktop { display: none !important; }
-          .messages-conv-list { border-radius: 12px !important; }
+          .messages-search { display: flex !important; }
+          .messages-conv-list { border-radius: 6px !important; }
           .messages-chat-panel {
             height: calc(100vh - 64px - 60px - env(safe-area-inset-bottom, 0px) - 1.5rem) !important;
             max-height: calc(100vh - 64px - 60px - env(safe-area-inset-bottom, 0px) - 1.5rem) !important;

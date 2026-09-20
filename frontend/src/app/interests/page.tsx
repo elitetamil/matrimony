@@ -485,8 +485,8 @@ function SidebarLink({
         cursor: "pointer", fontFamily: "var(--font-sans)",
         fontSize: "0.875rem",
         fontWeight: active ? 700 : 400,
-        color: color || (active ? "#E8401A" : "#333"),
-        borderLeft: active ? "3px solid #E8401A" : "3px solid transparent",
+        color: color || (active ? "var(--primary)" : "#333"),
+        borderLeft: active ? "3px solid var(--primary)" : "3px solid transparent",
         transition: "all 0.12s",
       }}
     >
@@ -496,7 +496,7 @@ function SidebarLink({
           style={{
             display: "inline-flex", alignItems: "center", justifyContent: "center",
             width: "18px", height: "18px",
-            background: "#E8401A", color: "#fff",
+            background: "var(--primary)", color: "#fff",
             borderRadius: "50%", fontSize: "0.625rem", fontWeight: 700,
             lineHeight: 1,
           }}
@@ -707,8 +707,20 @@ function InterestsContent() {
         }
       `}</style>
 
-      <main style={{ background: "#f2f2f2", minHeight: "100vh", padding: "1rem 0" }}>
-        <div style={{ maxWidth: "1060px", margin: "0 auto", padding: "0 0.875rem", display: "flex", gap: "1rem", alignItems: "flex-start" }}>
+      <main style={{ background: "#f2f2f2", height: "calc(100vh - 64px)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            maxWidth: "1100px",
+            width: "100%",
+            margin: "0 auto",
+            padding: "0.75rem",
+            display: "flex",
+            gap: "1rem",
+            alignItems: "stretch",
+            flex: 1,
+            overflow: "hidden",
+          }}
+        >
 
           {/* ── Mobile overlay ── */}
           {sidebarOpen && (
@@ -723,14 +735,14 @@ function InterestsContent() {
             ref={sidebarRef}
             className="interests-sidebar"
             style={{
-              width: "220px", flexShrink: 0,
+              width: "268px", flexShrink: 0,
               background: "#fff",
               border: "1px solid #e0e0e0",
-              position: "sticky",
-              top: "80px",
-              maxHeight: "calc(100vh - 100px)",
+              borderRadius: "6px",
               overflowY: "auto",
-              overscrollBehaviorY: "auto",
+              overscrollBehavior: "contain",
+              alignSelf: "flex-start",
+              height: "100%",
             }}
           >
             {/* Interests Received */}
@@ -744,7 +756,7 @@ function InterestsContent() {
                 count={f === "pending" ? receivedCounts.pending : undefined}
                 active={section === "received" && receivedFilter === f}
                 onClick={() => { setSection("received"); setReceivedFilter(f); setSidebarOpen(false); }}
-                color={f === "declined" ? "#E8401A" : undefined}
+                color={f === "declined" ? "var(--primary)" : undefined}
               />
             ))}
 
@@ -762,7 +774,7 @@ function InterestsContent() {
                 count={f === "pending" ? sentCounts.pending : undefined}
                 active={section === "sent" && sentFilter === f}
                 onClick={() => { setSection("sent"); setSentFilter(f); setSidebarOpen(false); }}
-                color={f === "declined" ? "#E8401A" : undefined}
+                color={f === "declined" ? "var(--primary)" : undefined}
               />
             ))}
 
@@ -770,16 +782,19 @@ function InterestsContent() {
           </aside>
 
           {/* ── MAIN ── */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            {/* Mobile category button */}
-            <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+          <div style={{ flex: 1, minWidth: 0, overflowY: "auto", overflowX: "hidden", paddingRight: "2px", paddingBottom: "2rem" }}>
+            
+            <div style={{ position: "sticky", top: 0, zIndex: 10, background: "#f2f2f2", paddingTop: "0.25rem", paddingBottom: "0.5rem" }}>
+              {/* Mobile category button & Header */}
+              <div style={{ display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+                <BackButton />
               <button
                 onClick={() => setSidebarOpen(true)}
                 className="interests-sidebar-btn"
                 style={{
                   display: "flex", alignItems: "center", gap: "6px",
-                  padding: "0.5rem 0.875rem", border: "1.5px solid #E8401A",
-                  borderRadius: "20px", background: "#fff", color: "#E8401A",
+                  padding: "0.5rem 0.875rem", border: "1.5px solid var(--primary)",
+                  borderRadius: "20px", background: "#fff", color: "var(--primary)",
                   fontWeight: 700, fontSize: "0.8125rem", cursor: "pointer",
                   fontFamily: "var(--font-sans)", minHeight: "40px",
                 }}
@@ -790,24 +805,23 @@ function InterestsContent() {
                 {headingMap[currentFilter]}
               </button>
               <div style={{ display: "flex", gap: "0.5rem" }}>
-                <div style={{ marginTop: "2px" }}><BackButton /></div>
                 <div>
-                  <h1 style={{ fontSize: "1.0625rem", fontWeight: 700, color: "#111", margin: "0 0 3px" }}>
+                  <h1 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#111", margin: "0 0 3px", fontFamily: "var(--font-sans)" }}>
                     {headingMap[currentFilter]}{" "}
-                  <span style={{ color: "#E8401A" }}>
-                    ({loading
-                      ? "--"
-                      : section === "received"
-                        ? (receivedCounts[receivedFilter] || "--")
-                        : (sentCounts[sentFilter] || "--")})
-                  </span>
-                </h1>
-                <p style={{ fontSize: "0.8125rem", color: "#888", margin: 0 }}>
-                  {subtitleMap[section][currentFilter]}
-                </p>
+                    <span style={{ color: "var(--primary)" }}>
+                      ({loading
+                        ? "--"
+                        : section === "received"
+                          ? (receivedCounts[receivedFilter] || "--")
+                          : (sentCounts[sentFilter] || "--")})
+                    </span>
+                  </h1>
+                  <p style={{ fontSize: "0.8125rem", color: "#888", margin: 0 }}>
+                    {subtitleMap[section][currentFilter]}
+                  </p>
+                </div>
               </div>
-              </div>
-
+            </div>
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
                 {/* Search toggle */}
                 {showSearch ? (
@@ -868,7 +882,7 @@ function InterestsContent() {
               : !user
               ? (
                 <div style={{ background: "#fff", borderRadius: "8px", padding: "3rem", textAlign: "center", border: "1px solid #e0e0e0" }}>
-                  <p style={{ color: "#888" }}>Please <Link href="/login" style={{ color: "#E8401A" }}>log in</Link> to view interests.</p>
+                  <p style={{ color: "#888" }}>Please <Link href="/login" style={{ color: "var(--primary)" }}>log in</Link> to view interests.</p>
                 </div>
               )
               : displayed.length === 0
@@ -889,7 +903,7 @@ function InterestsContent() {
                     href="/matches"
                     style={{
                       display: "inline-block", padding: "0.5rem 1.5rem",
-                      background: "#E8401A", color: "#fff", borderRadius: "20px",
+                      background: "var(--primary)", color: "#fff", borderRadius: "20px",
                       textDecoration: "none", fontWeight: 700, fontSize: "0.875rem",
                       fontFamily: "var(--font-sans)",
                     }}
@@ -922,7 +936,6 @@ function InterestsContent() {
           </div>
         </div>
       </main>
-      <Footer />
     </>
   );
 }

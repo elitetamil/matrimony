@@ -1051,50 +1051,6 @@ img {
 }
 
 /* ============================================================
-   PROFILE CARD — Match list card (horizontal)
-   ============================================================ */
-
-.match-card-horizontal {
-  display: flex;
-  flex-direction: column;
-  background: #fff;
-  border: 1px solid #e8e8e8;
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: 10px;
-}
-
-@media (min-width: 480px) {
-  .match-card-horizontal {
-    flex-direction: row;
-  }
-}
-
-.match-card-photo {
-  width: 100%;
-  height: 200px;
-  object-fit: cover;
-  object-position: top;
-  display: block;
-  flex-shrink: 0;
-}
-
-@media (min-width: 480px) {
-  .match-card-photo {
-    width: 140px;
-    height: auto;
-    min-height: 180px;
-  }
-}
-
-@media (min-width: 768px) {
-  .match-card-photo {
-    width: 160px;
-    min-height: 192px;
-  }
-}
-
-/* ============================================================
    MATCH CARD ACTIONS — scroll on very small screens
    ============================================================ */
 
@@ -1906,15 +1862,6 @@ select {
     position: static !important;
   }
 
-  /* Match & interest card: horizontal → vertical on very small */
-  .match-card-horiz {
-    flex-direction: column !important;
-  }
-  .match-card-photo {
-    width: 100% !important;
-    height: 200px !important;
-  }
-
   /* Search filters: collapse sidebar */
   .search-layout { flex-direction: column !important; }
   .search-sidebar { width: 100% !important; }
@@ -1994,3 +1941,56 @@ select {
     font-size: 0.75rem !important;
   }
 }
+
+/* ============================================================
+   PROFILE CARD LAYOUT
+   ============================================================ */
+/* Smallest screens: horizontal split mini card */
+@media (max-width: 479px) {
+  .match-card-grid { 
+    display: grid !important; 
+    grid-template-columns: 140px 1fr !important;
+    grid-template-areas: "photo info" "actions actions" !important;
+  }
+  .match-card-photo-wrap {
+    width: 140px !important;
+    aspect-ratio: unset !important;
+    max-height: 220px !important;
+    min-height: 180px !important;
+    overflow: hidden !important;
+  }
+  .match-card-photo {
+    width: 100% !important;
+    height: 100% !important;
+    object-fit: cover !important;
+    object-position: top center !important;
+    min-height: 180px !important;
+    max-height: 220px !important;
+  }
+}
+/* Medium phones: side-by-side */
+@media (min-width: 480px) {
+  .match-card-grid { 
+    display: grid !important; 
+    grid-template-columns: 165px 1fr !important;
+    grid-template-areas: "photo info" "photo actions" !important;
+  }
+  .match-card-photo-wrap {
+    width: 165px !important;
+    aspect-ratio: unset !important;
+    min-height: 210px !important;
+  }
+  .match-card-photo {
+    height: 100% !important;
+    min-height: 210px !important;
+    max-height: 300px !important;
+  }
+}
+@media (min-width: 768px) {
+  .match-card-grid {
+    grid-template-columns: 190px 1fr !important;
+  }
+  .match-card-photo-wrap { width: 190px !important; min-height: 230px !important; }
+  .match-card-photo { min-height: 230px !important; max-height: 340px !important; }
+}
+.match-card-actions::-webkit-scrollbar { display: none; }

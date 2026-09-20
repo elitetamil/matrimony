@@ -465,35 +465,27 @@ function SearchContent() {
           display: none;
         }
       `}</style>
-      <main style={{ background: "var(--bg-page)", minHeight: "100vh" }}>
-        {/* Hero strip */}
+      <main style={{ background: "#f2f2f2", minHeight: "calc(100vh - 64px)", display: "flex", flexDirection: "column" }}>
         <div
           style={{
-            background: "var(--gradient-hero)",
-            padding: "1.5rem 0",
-            textAlign: "center",
+            maxWidth: "1100px",
+            width: "100%",
+            margin: "0 auto",
+            padding: "0.75rem",
+            display: "flex",
+            flexDirection: "column",
+            flex: 1,
+            paddingBottom: "6rem" /* ensure enough padding for sticky bottom bar */
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1rem" }}>
-            <BackButton style={{ color: "#fff", background: "rgba(255,255,255,0.1)" }} />
-            <h1
-            style={{
-              color: "#fff",
-              fontSize: "clamp(1.25rem, 2.5vw, 1.625rem)",
-              fontWeight: 800,
-              margin: 0,
-              fontFamily: "var(--font-sans)",
-            }}
-          >
-            Find Your Perfect Tamil Match
-          </h1>
+          {/* Page Header */}
+          <div style={{ position: "sticky", top: "-0.75rem", zIndex: 10, background: "#f2f2f2", paddingTop: "0.75rem", paddingBottom: "0.75rem", display: "flex", gap: "0.5rem", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap" }}>
+            <BackButton />
+            <h1 style={{ fontSize: "1.25rem", fontWeight: 800, color: "#111", margin: 0, fontFamily: "var(--font-sans)", flex: 1 }}>
+              Find Your Perfect Tamil Match
+            </h1>
           </div>
-          <p style={{ color: "rgba(255,255,255,0.8)", fontSize: "0.875rem", margin: "0.375rem 0 0" }}>
-            Search verified Tamil profiles and find your perfect match
-          </p>
-        </div>
 
-        <div style={{ maxWidth: "960px", margin: "0 auto", padding: "1.25rem 0.875rem 6rem" }}>
           {/* Tab card */}
           <div
             style={{
@@ -929,8 +921,6 @@ function SearchContent() {
           }
         }
       `}</style>
-
-      <Footer />
     </>
   );
 }
