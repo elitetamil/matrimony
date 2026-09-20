@@ -360,7 +360,7 @@ function MessagesContent() {
           {/* ── LEFT SIDEBAR: conversation list ── */}
             <aside
               style={{
-                width: "268px", flexShrink: 0,
+                width: "100%", maxWidth: "340px", flexShrink: 0,
                 background: "#fff",
                 border: "1px solid #e0e0e0",
                 borderRadius: "6px",
@@ -368,9 +368,8 @@ function MessagesContent() {
                 overscrollBehavior: "contain",
                 alignSelf: "flex-start",
                 height: "100%",
-                display: showChatOnMobile ? "none" : "block",
               }}
-              className="messages-conv-list"
+              className={`messages-conv-list ${showChatOnMobile ? "hidden-on-mobile" : ""}`}
             >
               {/* Sidebar Header */}
               <div style={{ padding: "0.875rem 1rem", borderBottom: "1px solid #f0f0f0", display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
@@ -443,7 +442,7 @@ function MessagesContent() {
                 borderRadius: "6px",
                 overflow: "hidden",
               }}
-              className="messages-chat-panel"
+              className={`messages-chat-panel ${!showChatOnMobile ? "hidden-on-mobile" : ""}`}
             >
               {!selectedId ? (
                 <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "2rem 1rem" }}>

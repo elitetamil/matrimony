@@ -186,13 +186,17 @@ function SearchContent() {
           education: row.education || "",
           religion: row.religion || "",
           community: row.caste || "",
-          caste: row.caste,
-          subcaste: row.subcaste,
+          caste: row.caste || "",
+          subcaste: row.subcaste || "",
           maritalStatus: row.marital_status || "",
+          motherTongue: row.mother_tongue || "",
+          physicalStatus: row.physical_status || "",
           height: row.height || "",
-          diet: row.diet,
-          dhosham: row.dhosham,
-          income: row.income,
+          diet: row.diet || "",
+          dhosham: row.dhosham || "",
+          star: row.star || "",
+          raasi: row.raasi || "",
+          income: row.income || "",
           isVerified: row.is_verified || false,
           isOnline: row.is_online || false,
           isPremium: row.is_premium || false,
@@ -217,29 +221,37 @@ function SearchContent() {
         p.community.toLowerCase().includes(q);
       if (!matches) return false;
     }
-    if (filters.religion && p.religion !== filters.religion) return false;
-    if (filters.caste && p.caste !== filters.caste) return false;
-    if (filters.sub_caste && p.subcaste !== filters.sub_caste) return false;
+    if (filters.religion && p.religion?.toLowerCase() !== filters.religion.toLowerCase()) return false;
+    if (filters.caste && p.caste?.toLowerCase() !== filters.caste.toLowerCase()) return false;
+    if (filters.sub_caste && p.subcaste?.toLowerCase() !== filters.sub_caste.toLowerCase()) return false;
     
     if (p.age < Number(filters.age_min) || p.age > Number(filters.age_max)) return false;
     if (p.height && Number(p.height) > 0) {
       if (Number(p.height) < Number(filters.height_min) || Number(p.height) > Number(filters.height_max)) return false;
     }
     
-    if (filters.mother_tongues && filters.mother_tongues.length > 0) {
-      if (!p.motherTongue || !filters.mother_tongues.includes(p.motherTongue)) return false;
+    if (filters.mother_tongue && filters.mother_tongue !== "") {
+      if (!p.motherTongue || p.motherTongue.toLowerCase() !== filters.mother_tongue.toLowerCase()) return false;
+    } else if (filters.mother_tongues && filters.mother_tongues.length > 0) {
+      const lowerPrefs = filters.mother_tongues.map((m:string) => m.toLowerCase());
+      if (!p.motherTongue || !lowerPrefs.includes(p.motherTongue.toLowerCase())) return false;
     }
     
-    if (filters.marital_status && p.maritalStatus !== filters.marital_status) return false;
-    if (filters.education && p.education !== filters.education) return false;
-    if (filters.occupation && p.occupation !== filters.occupation) return false;
-    if (filters.country && p.country !== filters.country) return false;
-    if (filters.state && p.state !== filters.state) return false;
-    if (filters.city && p.city !== filters.city) return false;
+    // Additional exact matches
+    if (filters.income && p.income && p.income.toLowerCase() !== filters.income.toLowerCase()) return false;
+    if (filters.star && p.star && p.star.toLowerCase() !== filters.star.toLowerCase()) return false;
+    if (filters.raasi && p.raasi && p.raasi.toLowerCase() !== filters.raasi.toLowerCase()) return false;
     
-    if (filters.physical_status && p.physicalStatus && p.physicalStatus !== filters.physical_status) return false;
-    if (filters.eating && p.diet && p.diet !== filters.eating) return false;
-    if (filters.dhosham && p.dhosham && p.dhosham !== filters.dhosham) return false;
+    if (filters.marital_status && p.maritalStatus?.toLowerCase() !== filters.marital_status.toLowerCase()) return false;
+    if (filters.education && p.education?.toLowerCase() !== filters.education.toLowerCase()) return false;
+    if (filters.occupation && p.occupation?.toLowerCase() !== filters.occupation.toLowerCase()) return false;
+    if (filters.country && p.country?.toLowerCase() !== filters.country.toLowerCase()) return false;
+    if (filters.state && p.state?.toLowerCase() !== filters.state.toLowerCase()) return false;
+    if (filters.city && p.city?.toLowerCase() !== filters.city.toLowerCase()) return false;
+    
+    if (filters.physical_status && p.physicalStatus && p.physicalStatus.toLowerCase() !== filters.physical_status.toLowerCase()) return false;
+    if (filters.eating && p.diet && p.diet.toLowerCase() !== filters.eating.toLowerCase()) return false;
+    if (filters.dhosham && p.dhosham && p.dhosham.toLowerCase() !== filters.dhosham.toLowerCase()) return false;
 
     if (filters.verified_only && !p.isVerified) return false;
     if (hiddenIds.has(p.id)) return false;

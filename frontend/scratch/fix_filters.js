@@ -1,6 +1,9 @@
 const fs = require('fs');
 
-const page = fs.readFileSync('src/app/search/regular/page.tsx', 'utf8');
+let page = fs.readFileSync('src/app/search/regular/page.tsx', 'utf8');
+
+// Normalize line endings
+page = page.replace(/\r\n/g, '\n');
 
 const targetMappingStr = `          caste: row.caste,
           subcaste: row.subcaste,
@@ -22,14 +25,16 @@ const replacementMappingStr = `          caste: row.caste || "",
           raasi: row.raasi || "",
           income: row.income || "",`;
 
-let newPage = page.replace(targetMappingStr, replacementMappingStr);
+if (!page.includes(targetMappingStr)) {
+  console.error("Mapping string not found!");
+  process.exit(1);
+}
+page = page.replace(targetMappingStr, replacementMappingStr);
 
 const targetFilterStr = `    if (filters.mother_tongues && filters.mother_tongues.length > 0) {
       if (!p.motherTongue || !filters.mother_tongues.includes(p.motherTongue)) return false;
     }`;
 
-// Notice: In our UI we bound Mother Tongue to a single select: `mother_tongue` string instead of `mother_tongues` array.
-// Let's support both `mother_tongues` array (from initial state) and `mother_tongue` string (from the new UI select).
 const replacementFilterStr = `    if (filters.mother_tongue && filters.mother_tongue !== "") {
       if (!p.motherTongue || p.motherTongue !== filters.mother_tongue) return false;
     } else if (filters.mother_tongues && filters.mother_tongues.length > 0) {
@@ -41,7 +46,11 @@ const replacementFilterStr = `    if (filters.mother_tongue && filters.mother_to
     if (filters.star && p.star && p.star !== filters.star) return false;
     if (filters.raasi && p.raasi && p.raasi !== filters.raasi) return false;`;
 
-newPage = newPage.replace(targetFilterStr, replacementFilterStr);
+if (!page.includes(targetFilterStr)) {
+  console.error("Filter string not found!");
+  process.exit(1);
+}
+page = page.replace(targetFilterStr, replacementFilterStr);
 
-fs.writeFileSync('src/app/search/regular/page.tsx', newPage);
+fs.writeFileSync('src/app/search/regular/page.tsx', page);
 console.log('Successfully applied mapping and filtering fixes');
