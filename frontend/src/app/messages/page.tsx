@@ -486,7 +486,7 @@ function MessagesContent() {
                     >
                       <ArrowLeft size={20} />
                     </button>
-                    <Link href={`/profile/${selectedId}`} style={{ display: "flex", flexShrink: 0 }}>
+                    <Link href={`/profile/${selectedId}?from=messages`} style={{ display: "flex", flexShrink: 0 }}>
                       <Avatar src={displayProfile?.photoUrl} name={displayProfile?.name || "Member"} size={38} />
                     </Link>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -532,7 +532,7 @@ function MessagesContent() {
                             onClick={() => setIsMoreMenuOpen(false)}
                           >
                           <Link
-                            href={`/profile/${selectedId}`}
+                            href={`/profile/${selectedId}?from=messages`}
                             style={{
                               display: "flex", alignItems: "center", gap: "10px",
                               padding: "0.75rem 1rem", color: "#222", textDecoration: "none",

@@ -1,20 +1,41 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import {
-  ChevronDown, ArrowRight, CheckCircle, Shield, Users, Star,
-  Crown, Camera, Briefcase, FileText, MapPin, Heart,
-  Users2, Sparkles, Eye, Search, User, Settings2, Mail, X, RefreshCw
+  Home, ChevronDown, ChevronRight, ChevronLeft, ArrowRight, CheckCircle, CheckCircle2,
+  Circle, Shield, Users, Star, Crown, Camera, Briefcase, FileText, MapPin, Heart,
+  Users2, Sparkles, Eye, Search, User, Settings, Settings2, Mail, X, RefreshCw,
+  Clock, Bookmark, Info, MessageSquare, Send, Bell, Check
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
+import { validateEmail } from "@/lib/email-validator";
 import ProfileCard from "@/components/ui/ProfileCard";
 import { PROFILE_FOR_OPTIONS } from "@/data/matrimony-data";
-import { fetchMatchProfiles, fetchLatestProfiles, type RegisteredUser, computeProfileCompletion, getProfilesByMobile, loginWithOtpSession } from "@/lib/auth-store";
+import {
+  fetchMatchProfiles,
+  fetchLatestProfiles,
+  type RegisteredUser,
+  computeProfileCompletion,
+  getProfilesByMobile,
+  loginWithOtpSession,
+  loginToProfile,
+  getDailyRecommendations,
+  getViewedMe,
+  getShortlistedMe,
+  getViewedByMe,
+  getShortlistedProfiles,
+  getNewlyJoined,
+  getInterestsReceived,
+  acceptInterest,
+  shortlistProfile,
+  removeShortlist,
+  type InterestRow
+} from "@/lib/auth-store";
 import { supabase } from "@/lib/supabase";
 import ConfirmDialog from "@/components/ui/ConfirmDialog";
 
@@ -208,7 +229,7 @@ function HeroAuthCard() {
   const [tab, setTab] = useState<"login" | "register">("register");
 
   useEffect(() => {
-            if (typeof window !== "undefined") {
+    if (typeof window !== "undefined") {
       const resetScroll = () => {
         document.documentElement.style.scrollBehavior = "auto";
         window.scrollTo(0, 0);
@@ -247,23 +268,30 @@ function HeroAuthCard() {
     const val = otpId.trim();
     const type = detectType(val);
     if (type === "unknown") { toast.error("Enter a valid email or 10-digit mobile number"); return; }
-    setSendingOtp(true);
-    try {
-      if (type === "email") {
+    if (type === "email") {
+      const emailValidation = validateEmail(val);
+      if (!emailValidation.valid) {
+        toast.error(emailValidation.error || "Please enter a valid Gmail address.");
+        return;
+      }
+      setSendingOtp(true);
+      try {
         const res = await fetch("/api/send-email-otp", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: val }) });
         const data = await res.json();
         if (!res.ok) { toast.error(data.error || "Failed to send OTP"); setSendingOtp(false); return; }
         toast.success(`OTP sent to ${val}`);
-      } else {
-        const digits = val.replace(/\D/g, "");
-        toast.success(`OTP sent to +91 ${digits}`);
-        // Redirect to full login page for phone OTP (MSG91 widget required)
-        window.location.href = `/login?mobile=${digits}&autosend=true`;
-        return;
+        setSendingOtp(false);
+        setOtpSent(true);
+      } catch {
+        toast.error("Network error. Please try again.");
+        setSendingOtp(false);
       }
-    } catch { toast.error("Network error. Please try again."); setSendingOtp(false); return; }
-    setSendingOtp(false);
-    setOtpSent(true);
+    } else {
+      const digits = val.replace(/\D/g, "");
+      toast.success(`OTP sent to +91 ${digits}`);
+      // Redirect to full login page for phone OTP (MSG91 widget required)
+      window.location.href = `/login?mobile=${digits}&autosend=true`;
+    }
   };
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
@@ -444,22 +472,30 @@ function HeroAuthCard() {
 }
 
 function AuthenticatedDashboard() {
-  const { user, refresh } = useAuth();
+  const { user, setUser, refresh } = useAuth();
   const router = useRouter();
   const [dailyRecs, setDailyRecs] = useState<RegisteredUser[]>([]);
+  const [viewedMeProfiles, setViewedMeProfiles] = useState<RegisteredUser[]>([]);
+  const [viewedByMeProfiles, setViewedByMeProfiles] = useState<RegisteredUser[]>([]);
+  const [receivedInterests, setReceivedInterests] = useState<InterestRow[]>([]);
+  const [shortlistedProfilesList, setShortlistedProfilesList] = useState<RegisteredUser[]>([]);
+  const [shortlistedIds, setShortlistedIds] = useState<Set<string>>(new Set());
   const [loadingRecs, setLoadingRecs] = useState(true);
-  const [timeLeft, setTimeLeft] = useState("");
-  const [hideCompleteBanner, setHideCompleteBanner] = useState(false);
-  useEffect(() => {
-    if (localStorage.getItem('hideCompleteBanner') === 'true') {
-      setHideCompleteBanner(true);
-    }
-  }, []);
-
+  const [loadingExtras, setLoadingExtras] = useState(true);
   const [multiProfiles, setMultiProfiles] = useState<RegisteredUser[]>([]);
   const [switchConfirmOpen, setSwitchConfirmOpen] = useState(false);
+  const [switchDropdownOpen, setSwitchDropdownOpen] = useState(false);
   const [targetAccount, setTargetAccount] = useState<RegisteredUser | null>(null);
   const [upgrading, setUpgrading] = useState(false);
+  const recScrollRef = useRef<HTMLDivElement>(null);
+
+  // Dynamic Greeting based on local time
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return "Good Morning";
+    if (hour < 17) return "Good Afternoon";
+    return "Good Evening";
+  };
 
   // Fetch profiles with same mobile number for switch account feature
   useEffect(() => {
@@ -478,36 +514,55 @@ function AuthenticatedDashboard() {
   const handleSwitchAccount = async () => {
     if (!targetAccount) return;
     setSwitchConfirmOpen(false);
-    
+
     const toastId = toast.loading("Switching account...");
     try {
-      const res = await fetch("/api/otp-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId: targetAccount.id }),
-      });
-      const loginData = await res.json();
-      if (!res.ok) {
-        toast.error(loginData.error || "Failed to switch account.", { id: toastId });
+      let switchedUser: RegisteredUser | null = null;
+      try {
+        const res = await fetch("/api/otp-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileId: targetAccount.id }),
+        });
+        const loginData = await res.json();
+        if (res.ok && loginData.access_token) {
+          switchedUser = await loginWithOtpSession(loginData.access_token, loginData.refresh_token);
+        }
+      } catch (e) {
+        console.warn("[SwitchAccount] API login failed, attempting fallback:", e);
+      }
+
+      if (!switchedUser) {
+        switchedUser = await loginToProfile(targetAccount.id);
+      }
+
+      if (switchedUser) {
+        setUser(switchedUser);
+        toast.success(`Switched to ${targetAccount.name}`, { id: toastId });
+        window.location.href = "/";
         return;
       }
-      const result = await loginWithOtpSession(loginData.access_token, loginData.refresh_token);
-      if (!result) {
-        toast.error("Failed to switch account. Please log in again.", { id: toastId });
-        return;
-      }
-      toast.success(`Switched to ${targetAccount.name}`, { id: toastId });
-      window.location.href = "/";
+
+      toast.error("Failed to switch account. Please try again.", { id: toastId });
     } catch {
       toast.error("Network error while switching account.", { id: toastId });
     }
   };
 
-  const [matchCounts, setMatchCounts] = useState(() => {
+  interface DashboardCounts {
+    allMatches: number;
+    newMatches: number;
+    whoViewedYou: number;
+    whoShortlistedYou: number;
+    profilesYouViewed: number;
+    shortlistedByYou: number;
+  }
+
+  const [matchCounts, setMatchCounts] = useState<DashboardCounts>(() => {
     if (typeof window !== "undefined") {
       const cached = sessionStorage.getItem("dash_matchCounts");
       if (cached) {
-        try { return JSON.parse(cached); } catch(e) {}
+        try { return JSON.parse(cached); } catch (e) { }
       }
     }
     return {
@@ -526,38 +581,84 @@ function AuthenticatedDashboard() {
     return true;
   });
 
-  // Countdown until midnight
-  useEffect(() => {
-    const tick = () => {
-      const now = new Date();
-      const midnight = new Date();
-      midnight.setHours(24, 0, 0, 0);
-      const diff = midnight.getTime() - now.getTime();
-      const h = Math.floor(diff / 3600000).toString().padStart(2, "0");
-      const m = Math.floor((diff % 3600000) / 60000).toString().padStart(2, "0");
-      const s = Math.floor((diff % 60000) / 1000).toString().padStart(2, "0");
-      setTimeLeft(`${h}h:${m}m:${s}s`);
-    };
-    tick();
-    const id = setInterval(tick, 1000);
-    return () => clearInterval(id);
-  }, []);
+  // Dynamic compatibility match score calculator
+  const computeMatchScore = (target: RegisteredUser): number => {
+    if (!user) return 85;
+    let score = 76;
+    if (user.religion && target.religion && user.religion.toLowerCase() === target.religion.toLowerCase()) score += 7;
+    if (user.caste && target.caste && user.caste.toLowerCase() === target.caste.toLowerCase()) score += 6;
+    if (user.motherTongue && target.motherTongue && user.motherTongue.toLowerCase() === target.motherTongue.toLowerCase()) score += 5;
+    if (user.city && target.city && user.city.toLowerCase() === target.city.toLowerCase()) score += 4;
+    // Consistent hash variation by ID
+    const hash = target.id.split("").reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const variation = (hash % 7) - 3;
+    return Math.min(98, Math.max(78, score + variation));
+  };
+
+  // Scroll handler for Recommended For You carousel
+  const scrollRecs = (direction: "left" | "right") => {
+    if (recScrollRef.current) {
+      const amount = direction === "left" ? -230 : 230;
+      recScrollRef.current.scrollBy({ left: amount, behavior: "smooth" });
+    }
+  };
+
+  // Handle shortlist toggle
+  const handleToggleShortlist = async (e: React.MouseEvent, targetId: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user) return;
+    const isCurrently = shortlistedIds.has(targetId);
+    const nextSet = new Set(shortlistedIds);
+    if (isCurrently) {
+      nextSet.delete(targetId);
+      setShortlistedIds(nextSet);
+      setMatchCounts(prev => ({ ...prev, shortlistedByYou: Math.max(0, prev.shortlistedByYou - 1) }));
+      await removeShortlist(user.id, targetId);
+      toast.success("Removed from shortlist");
+    } else {
+      nextSet.add(targetId);
+      setShortlistedIds(nextSet);
+      setMatchCounts(prev => ({ ...prev, shortlistedByYou: prev.shortlistedByYou + 1 }));
+      await shortlistProfile(user.id, targetId);
+      toast.success("Added to shortlist");
+    }
+  };
+
+  // Handle accept interest
+  const handleAcceptInterest = async (interestId: string, senderName?: string) => {
+    const toastId = toast.loading("Accepting interest...");
+    try {
+      const res = await acceptInterest(interestId);
+      if (res.error) {
+        toast.error(res.error, { id: toastId });
+      } else {
+        toast.success(`Accepted interest from ${senderName || "member"}!`, { id: toastId });
+        setReceivedInterests(prev => prev.filter(i => i.id !== interestId));
+      }
+    } catch {
+      toast.error("Failed to accept interest", { id: toastId });
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
-    const {
-      getDailyRecommendations, fetchMatchProfiles, getViewedMe, getShortlistedMe,
-      getViewedByMe, getShortlistedProfiles, getNewlyJoined,
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    } = require("@/lib/auth-store");
     const opp = user.gender === "male" ? "female" : user.gender === "female" ? "male" : null;
 
+    // Load recommendations
     getDailyRecommendations(user.id, user.gender)
-      .then((data: RegisteredUser[]) => setDailyRecs(data.slice(0, 10)))
+      .then((data: RegisteredUser[]) => {
+        if (data && data.length > 0) {
+          setDailyRecs(data);
+        } else {
+          // Fallback to general matches if daily recs empty
+          fetchMatchProfiles(user, opp || undefined).then((fallback) => setDailyRecs(fallback.slice(0, 10)));
+        }
+      })
       .catch(() => setDailyRecs([]))
       .finally(() => setLoadingRecs(false));
 
-    // Load counts
+    // Load all other dynamic sections
     Promise.all([
       fetchMatchProfiles(user, opp || undefined),
       getNewlyJoined(user.id, opp),
@@ -565,7 +666,8 @@ function AuthenticatedDashboard() {
       getShortlistedMe(user.id, opp),
       getViewedByMe(user.id, opp),
       getShortlistedProfiles(user.id),
-    ]).then(([all, newM, viewedMe, shortlistedMe, viewedByMe, shortlisted]: RegisteredUser[][]) => {
+      getInterestsReceived(user.id, "pending"),
+    ]).then(([all, newM, viewedMe, shortlistedMe, viewedByMe, shortlisted, interests]) => {
       const counts = {
         allMatches: all.length,
         newMatches: newM.length,
@@ -576,595 +678,1163 @@ function AuthenticatedDashboard() {
       };
       setMatchCounts(counts);
       sessionStorage.setItem("dash_matchCounts", JSON.stringify(counts));
-    }).catch(() => {})
-      .finally(() => setLoadingCounts(false));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.id]);
+
+      setViewedMeProfiles(viewedMe || []);
+      setViewedByMeProfiles(viewedByMe || []);
+      setShortlistedProfilesList(shortlisted || []);
+      setShortlistedIds(new Set(shortlisted.map((p) => p.id)));
+      setReceivedInterests(interests || []);
+    }).catch((err) => {
+      console.warn("[Dashboard] error fetching supplemental data:", err);
+    }).finally(() => {
+      setLoadingCounts(false);
+      setLoadingExtras(false);
+    });
+  }, [user?.id, user?.gender]);
 
   if (!user) return null;
 
-
-  // Profile completeness — which fields are missing (for chip display only)
-  // NOTE: Add Photo and Set Partner Preferences are NOT shown on home page directly
-  const missing: { label: string; href: string; icon: React.ReactNode }[] = [];
-  if (!user.email || user.email.endsWith("@etm.app")) missing.push({ label: "Add Email", href: "/profile/edit?section=contact", icon: <Mail size={16} color="#6B1A2A" /> });
-  if (!user.education && !user.occupation) missing.push({ label: "Professional Details", href: "/profile/edit?section=professional", icon: <Briefcase size={16} color="#6B1A2A" /> });
-  if (!user.star && !user.rasi) missing.push({ label: "Horoscope Details", href: "/profile/edit?section=religion", icon: <Star size={16} color="#C8973A" /> });
-  if (!user.about) missing.push({ label: "About Me", href: "/profile/edit?section=about", icon: <FileText size={16} color="#6B1A2A" /> });
-  if (!user.city) missing.push({ label: "Location", href: "/profile/edit?section=location", icon: <MapPin size={16} color="#6B1A2A" /> });
-
-  // Use the shared computeProfileCompletion for a consistent percentage everywhere
   const pct = computeProfileCompletion(user);
-
   const profileCode = `ETM${user.id.replace(/-/g, "").slice(0, 7).toUpperCase()}`;
   const userPhoto = user.photoUrl || null;
 
-  // Match stat tiles
-  const STAT_TILES: { label: string; count: number; href: string; icon: React.ReactNode }[] = [
-    { label: "All Matches", count: matchCounts.allMatches, href: "/matches", icon: <Users2 size={20} color="#6B1A2A" /> },
-    { label: "New Matches", count: matchCounts.newMatches, href: "/matches?tab=newly_joined", icon: <Sparkles size={20} color="#C8973A" /> },
-    { label: "Who Viewed You", count: matchCounts.whoViewedYou, href: "/matches?tab=viewed_you", icon: <Eye size={20} color="#6B1A2A" /> },
-    { label: "Who Shortlisted You", count: matchCounts.whoShortlistedYou, href: "/matches?tab=shortlisted_you", icon: <Star size={20} color="#C8973A" fill="#C8973A" /> },
-    { label: "Profiles You Viewed", count: matchCounts.profilesYouViewed, href: "/matches?tab=viewed_by_you", icon: <Search size={20} color="#6B1A2A" /> },
-    { label: "Shortlisted By You", count: matchCounts.shortlistedByYou, href: "/shortlisted", icon: <Heart size={20} color="#6B1A2A" /> },
-  ];
-
-  // Profile completion banner (shown once after registration if profile < 80%)
-  const showCompletionBanner = pct < 80;
+  // Dynamic checklist conditions for Right Sidebar "Complete Your Profile"
+  const hasBasicDetails = !!(user.name && user.dob && user.gender);
+  const hasEducation = !!(user.education && user.education !== "—");
+  const hasCareer = !!(user.occupation && user.occupation !== "—");
+  const hasPartnerPrefs = !!(user.partnerAgeMin || user.partnerAgeMax || user.partnerReligion || user.partnerCaste || user.partnerEducation);
+  const hasFamilyDetails = !!(user.fatherOccupation || user.motherOccupation || user.familyStatus || user.familyType);
+  const hasMorePhotos = !!(user.photos && user.photos.length > 1) || (!!user.photoUrl && !!user.photos && user.photos.length > 0);
 
   return (
-    <div style={{ background: "#FFF8F0", minHeight: "100vh" }}>
+    <div style={{ background: "#FAF6F0", minHeight: "100vh", fontFamily: "var(--font-sans)" }}>
       <Navbar />
 
-      {/* Profile Completion Banner */}
-      {showCompletionBanner && (
-        <div style={{
-          background: "linear-gradient(90deg, #6B1A2A 0%, #9B2D42 100%)",
-          color: "#fff",
-          padding: "0.75rem 1rem",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          gap: "1rem",
-          flexWrap: "wrap",
-          textAlign: "center",
-        }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-            <span style={{ fontSize: "0.875rem", fontWeight: 700 }}>
-              ✨ Your profile is {pct}% complete.
-            </span>
-            <span style={{ fontSize: "0.8125rem", opacity: 0.9 }}>
-              Complete your profile to get better matches!
-            </span>
-          </div>
-          <a
-            href="/profile/edit"
-            style={{
-              background: "#fff",
-              color: "#6B1A2A",
-              padding: "0.375rem 1rem",
-              borderRadius: "20px",
-              fontWeight: 700,
-              fontSize: "0.8125rem",
-              textDecoration: "none",
-              whiteSpace: "nowrap",
-            }}
-          >
-            Complete Profile →
-          </a>
-        </div>
-      )}
-
       <style>{`
-        @media (max-width: 899px) {
-          .dashboard-sidebar { display: none !important; }
-          .dashboard-stats-grid { grid-template-columns: repeat(2, 1fr) !important; }
-          .dash-main-wrap { padding: 0.875rem 0.75rem !important; }
+        .dashboard-container {
+          max-width: 1360px;
+          margin: 0 auto;
+          padding: 0.75rem 1.25rem 2rem;
+          display: flex;
+          gap: 1rem;
+          align-items: flex-start;
         }
-        @media (min-width: 900px) {
-          .dashboard-sidebar { display: block !important; }
-          .dashboard-stats-grid { grid-template-columns: repeat(3, 1fr) !important; }
-          .mobile-quick-access { display: none !important; }
+        .dash-left-sidebar {
+          width: 235px;
+          flex-shrink: 0;
+          position: sticky;
+          top: 80px;
+        }
+        .dash-center-main {
+          flex: 1;
+          min-width: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .dash-right-sidebar {
+          width: 275px;
+          flex-shrink: 0;
+          display: flex;
+          flex-direction: column;
+          gap: 1rem;
+        }
+        .stat-cards-grid {
+          display: grid;
+          grid-template-columns: repeat(5, 1fr);
+          gap: 0.625rem;
+        }
+        .two-column-split {
+          display: grid;
+          grid-template-columns: 1.15fr 1fr;
+          gap: 1rem;
+        }
+        .recs-carousel-track::-webkit-scrollbar {
+          display: none;
+        }
+        .recs-carousel-track {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
+        }
+        .side-nav-link {
+          display: flex;
+          align-items: center;
+          gap: 10px;
+          padding: 0.5625rem 1rem;
+          color: #3D2028;
+          text-decoration: none;
+          font-size: 0.8125rem;
+          font-weight: 500;
+          transition: background 0.15s ease, color 0.15s ease;
+          border-left: 3px solid transparent;
+        }
+        .side-nav-link:hover {
+          background: #FAF3EC;
+          color: #6B1A2A;
+        }
+        .side-nav-link.active {
+          background: #FEF2F4;
+          color: #6B1A2A;
+          font-weight: 700;
+          border-left: 3px solid #6B1A2A;
+        }
+        .nav-badge-pill {
+          margin-left: auto;
+          background: #6B1A2A;
+          color: #fff;
+          font-size: 0.625rem;
+          font-weight: 700;
+          padding: 1px 6px;
+          border-radius: 10px;
+        }
+        @media (max-width: 1220px) {
+          .dash-right-sidebar { display: none !important; }
+        }
+        @media (max-width: 960px) {
+          .dash-left-sidebar { display: none !important; }
+          .stat-cards-grid { grid-template-columns: repeat(2, 1fr) !important; }
+          .two-column-split { grid-template-columns: 1fr !important; }
+          .dashboard-container { padding: 0.5rem 0.75rem 1.5rem; }
         }
       `}</style>
 
-      <div
-        className="dash-main-wrap"
-        style={{
-          maxWidth: "1060px",
-          margin: "0 auto",
-          padding: "1.25rem 1rem",
-          display: "flex",
-          gap: "1.125rem",
-          alignItems: "flex-start",
-        }}
-      >
-        {/* ── LEFT SIDEBAR — hidden on mobile, bottom nav handles navigation ── */}
-        <aside
-          className="dashboard-sidebar"
-          style={{
-            width: "230px",
-            flexShrink: 0,
-            background: "#fff",
-            border: "1px solid #E8D5B7",
-            borderRadius: "6px",
-            overflow: "hidden",
-            position: "sticky",
-            top: "80px",
-            maxHeight: "calc(100vh - 90px)",
-            overflowY: "auto",
-            overscrollBehaviorY: "auto",
-          }}
-        >
-          {/* Avatar + name */}
-          <div style={{ padding: "1.25rem 1rem 1rem", textAlign: "center", borderBottom: "1px solid #F2E8D6" }}>
-              <div style={{ position: "relative", display: "inline-block", marginBottom: "0.75rem" }}>
+      <div className="dashboard-container">
+
+        {/* ========================================================================= */}
+        {/* 1. LEFT SIDEBAR                                                           */}
+        {/* ========================================================================= */}
+        <aside className="dash-left-sidebar">
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #EFE8DE",
+              borderRadius: "14px",
+              boxShadow: "0 2px 12px rgba(107,26,42,0.04)",
+              overflow: "hidden",
+            }}
+          >
+            {/* User Profile Header */}
+            <div style={{ padding: "1.25rem 1rem 1rem", textAlign: "center", borderBottom: "1px solid #F5ECE0" }}>
+              <div style={{ position: "relative", display: "inline-block", marginBottom: "0.625rem" }}>
                 <div
                   style={{
-                    width: "72px", height: "72px", borderRadius: "50%",
-                    border: "2px solid #E8D5B7",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    overflow: "hidden", background: userPhoto ? "transparent" : "#DFDFDF",
-                  }}>
-                  {userPhoto
-                    ? <img src={userPhoto} alt={user.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
-                    : <svg width="50" height="50" viewBox="0 0 24 24" fill="none" style={{ marginBottom: "-8px" }}><circle cx="12" cy="8" r="5" fill="#FFFFFF" /><path d="M4 22c0-4.5 3.5-8 8-8s8 3.5 8 8" fill="#FFFFFF" /></svg>
-                  }
+                    width: "72px",
+                    height: "72px",
+                    borderRadius: "50%",
+                    border: "2.5px solid #F0E2D2",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    overflow: "hidden",
+                    background: userPhoto ? "transparent" : "#EDE5DC",
+                    margin: "0 auto",
+                  }}
+                >
+                  {userPhoto ? (
+                    <img src={userPhoto} alt={user.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
+                  ) : (
+                    <Users size={36} color="#A08088" />
+                  )}
                 </div>
+              </div>
+
+              <div style={{ fontWeight: 800, fontSize: "0.9375rem", color: "#2D1018", lineHeight: 1.25, marginBottom: "2px" }}>
+                {user.name}
+              </div>
+              <div style={{ fontSize: "0.75rem", fontWeight: 700, color: "#8B6070", letterSpacing: "0.02em", marginBottom: "0.625rem" }}>
+                {profileCode}
+              </div>
+
+              {/* Profile Progress Bar */}
+              <div style={{ marginBottom: "0.75rem", padding: "0 0.5rem" }}>
+                <div style={{ height: "4px", background: "#EFE8DE", borderRadius: "3px", overflow: "hidden", marginBottom: "4px" }}>
+                  <div style={{ height: "100%", width: `${pct}%`, background: "#2E7D32", borderRadius: "3px" }} />
+                </div>
+                <div style={{ fontSize: "0.6875rem", color: "#8B6070", fontWeight: 600 }}>
+                  Profile {pct}% Complete
+                </div>
+              </div>
+
+              {/* Complete Profile Button */}
               <Link
-                href="/profile/edit?section=photo"
+                href="/profile/edit"
                 style={{
-                  position: "absolute", bottom: 0, right: 0,
-                  width: "22px", height: "22px",
-                  background: "#fff", border: "1px solid #E8D5B7",
-                  borderRadius: "50%",
-                  display: "flex", alignItems: "center", justifyContent: "center",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  gap: "4px",
+                  padding: "0.375rem 1rem",
+                  borderRadius: "20px",
+                  border: "1px solid #E5D5C5",
+                  background: "#FFFFFF",
+                  color: "#6B1A2A",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.03)",
+                  transition: "all 0.15s ease",
                 }}
-                title="Change photo"
               >
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#6B1A2A" strokeWidth="2">
-                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
-                  <circle cx="12" cy="13" r="4"/>
-                </svg>
+                Complete Profile &rarr;
               </Link>
             </div>
 
-            <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111", marginBottom: "2px" }}>{user.name}</div>
-            <div style={{ fontSize: "0.75rem", color: "#5C3040", marginBottom: "4px" }}>Elite Tamil Matrimony</div>
-            <div style={{ fontSize: "0.8125rem", fontWeight: 700, color: "#2D1018", marginBottom: "4px" }}>{profileCode}</div>
-            {/* Premium badge — only for paid members */}
-            {user.isPremium ? (
-              <div style={{
-                display: "inline-flex", alignItems: "center", gap: "4px",
-                background: "linear-gradient(135deg, #C8973A, #E8C060)",
-                color: "#fff", borderRadius: "20px",
-                padding: "2px 10px", fontSize: "0.6875rem", fontWeight: 700,
-              }}>
-                <Crown size={11} fill="#fff" strokeWidth={0} /> Premium Member
-              </div>
-            ) : (
-              <div style={{ fontSize: "0.75rem", color: "#5C3040", fontWeight: 400 }}>Free member</div>
-            )}
-          </div>
+            {/* Sidebar Navigation Items */}
+            <div style={{ padding: "0.5rem 0" }}>
+              <Link href="/" className="side-nav-link active">
+                <Home size={16} /> Home
+              </Link>
+              <Link href="/matches" className="side-nav-link">
+                <Heart size={16} /> My Matches
+              </Link>
+              <Link href="/interests" className="side-nav-link">
+                <Send size={16} /> My Interests
+              </Link>
+              <Link href="/messages" className="side-nav-link">
+                <MessageSquare size={16} /> Messages
+                {receivedInterests.length > 0 && (
+                  <span className="nav-badge-pill">{receivedInterests.length}</span>
+                )}
+              </Link>
+              <Link href="/matches?tab=viewed_you" className="side-nav-link">
+                <Eye size={16} /> Profile Visitors
+                {matchCounts.whoViewedYou > 0 && (
+                  <span className="nav-badge-pill">{matchCounts.whoViewedYou}</span>
+                )}
+              </Link>
+              <Link href="/shortlisted" className="side-nav-link">
+                <Bookmark size={16} /> Shortlisted Profiles
+              </Link>
+              <Link href="/settings" className="side-nav-link">
+                <Settings size={16} /> Settings
+              </Link>
 
-          {/* Upgrade CTA — only for free members */}
-          {!user.isPremium && (
+              {/* MY ACCOUNT Section */}
+              <div style={{ padding: "0.875rem 1rem 0.25rem", fontSize: "0.6875rem", fontWeight: 800, color: "#9E7A85", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                My Account
+              </div>
+              <Link href="/profile/edit" className="side-nav-link">
+                <User size={15} /> Edit Profile
+              </Link>
+              <Link href="/profile/edit?section=partner" className="side-nav-link">
+                <Settings2 size={15} /> Edit Preferences
+              </Link>
+              <Link href="/settings?tab=privacy" className="side-nav-link">
+                <Shield size={15} /> Privacy Settings
+              </Link>
+              <div
+                onClick={() => setSwitchDropdownOpen(!switchDropdownOpen)}
+                className="side-nav-link"
+                style={{ cursor: "pointer", userSelect: "none" }}
+              >
+                <RefreshCw size={15} /> Switch Account
+                <ChevronDown size={14} style={{ marginLeft: "auto", transform: switchDropdownOpen ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+              </div>
+
+              {/* Switch Account Dropdown */}
+              {switchDropdownOpen && (
+                <div style={{ background: "#FAF7F2", padding: "0.375rem 0.75rem", borderTop: "1px solid #F0E4D5", borderBottom: "1px solid #F0E4D5" }}>
+                  {multiProfiles.length > 0 ? (
+                    multiProfiles.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => {
+                          setTargetAccount(p);
+                          setSwitchConfirmOpen(true);
+                          setSwitchDropdownOpen(false);
+                        }}
+                        style={{
+                          width: "100%",
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "8px",
+                          padding: "0.375rem 0.5rem",
+                          border: "none",
+                          background: "transparent",
+                          cursor: "pointer",
+                          fontSize: "0.75rem",
+                          fontWeight: 600,
+                          color: "#6B1A2A",
+                          borderRadius: "6px",
+                          textAlign: "left",
+                        }}
+                        onMouseEnter={(e) => (e.currentTarget.style.background = "#F2E8DC")}
+                        onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                      >
+                        <span style={{ width: "8px", height: "8px", borderRadius: "50%", background: "#6B1A2A" }} />
+                        {p.name}
+                      </button>
+                    ))
+                  ) : (
+                    <div style={{ fontSize: "0.6875rem", color: "#8B6070", padding: "0.25rem" }}>
+                      No other profiles under this mobile number.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Bottom Promo Card */}
             <div
               style={{
-                margin: "0.875rem 0.875rem 0",
-                background: "linear-gradient(135deg, #FBF6EC, #F5EDDC)",
-                border: "1px solid #E0C070",
-                borderRadius: "6px",
-                padding: "0.75rem",
+                margin: "0.5rem 0.875rem 1rem",
+                background: "linear-gradient(135deg, #FFF9F5 0%, #FFF3EC 100%)",
+                border: "1px solid #F5E0D5",
+                borderRadius: "10px",
+                padding: "0.875rem 0.75rem",
+                textAlign: "center",
               }}
             >
-              <p style={{ fontSize: "0.75rem", color: "#6B1A2A", margin: "0 0 0.5rem", lineHeight: 1.4, fontWeight: 600 }}>
-                Upgrade to call or message matches
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", color: "#C8973A", fontWeight: 800, fontSize: "0.75rem", marginBottom: "3px" }}>
+                <Crown size={14} fill="#C8973A" /> Unlock More Connections
+              </div>
+              <p style={{ fontSize: "0.6875rem", color: "#7A5060", margin: "0 0 0.625rem", lineHeight: 1.35 }}>
+                Get access to messaging, advanced search and more.
               </p>
               <Link
                 href="/membership"
-                onClick={() => setUpgrading(true)}
                 style={{
-                  display: "flex", justifyContent: "center", alignItems: "center", gap: "6px",
-                  padding: "0.375rem",
-                  background: "#6B1A2A", color: "#fff",
-                  borderRadius: "20px", textDecoration: "none",
-                  fontSize: "0.8125rem", fontWeight: 700,
-                  fontFamily: "var(--font-sans)",
-                  opacity: upgrading ? 0.7 : 1,
-                  pointerEvents: upgrading ? "none" : "auto",
+                  display: "block",
+                  background: "#6B1A2A",
+                  color: "#FFFFFF",
+                  padding: "0.4rem 0.75rem",
+                  borderRadius: "20px",
+                  fontSize: "0.75rem",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  transition: "background 0.15s",
                 }}
               >
-                {upgrading ? <><span style={{ animation: "spin 0.8s linear infinite", display: "inline-block" }}>⟳</span> Loading…</> : "Upgrade now"}
+                Explore Premium &rarr;
               </Link>
             </div>
-          )}
-
-          {/* Switch account */}
-          {multiProfiles.length > 0 && (
-            <div style={{ margin: "0.875rem 0 0", padding: "0.625rem 0.875rem", borderTop: "1px solid #F2E8D6" }}>
-              <div style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#999", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "0.5rem" }}>
-                Switch Account
-              </div>
-              {multiProfiles.map((p) => (
-                <button
-                  key={p.id}
-                  onClick={() => {
-                    setTargetAccount(p);
-                    setSwitchConfirmOpen(true);
-                  }}
-                  style={{
-                    display: "flex", alignItems: "center", gap: "6px",
-                    background: "none", border: "none", padding: "0.25rem 0",
-                    fontFamily: "var(--font-sans)", fontSize: "0.875rem",
-                    color: "#2D1018", fontWeight: 400, cursor: "pointer",
-                    textAlign: "left", width: "100%",
-                  }}
-                >
-                  <RefreshCw size={15} color="#888" />
-                  <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                    {p.name}
-                  </span>
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Quick links */}
-          <div style={{ padding: "0.25rem 0 0.875rem" }}>
-            {([
-              { href: "/profile/edit", icon: <User size={15} color="#6B1A2A" />, label: "Edit profile" },
-              { href: "/profile/edit?section=partner", icon: <Settings2 size={15} color="#6B1A2A" />, label: "Edit preferences" },
-              { href: "/shortlisted", icon: <Heart size={15} color="#6B1A2A" />, label: "Shortlisted" },
-              { href: "/interests", icon: <Mail size={15} color="#6B1A2A" />, label: "Interests" },
-            ] as { href: string; icon: React.ReactNode; label: string }[]).map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                style={{
-                  display: "flex", alignItems: "center", gap: "8px",
-                  padding: "0.5rem 0.875rem",
-                  color: "#2D1018", textDecoration: "none",
-                  fontSize: "0.875rem", fontWeight: 400,
-                  borderTop: "1px solid #F2E8D6",
-                }}
-              >
-                {item.icon} {item.label}
-              </Link>
-            ))}
           </div>
         </aside>
 
-        {/* ── RIGHT MAIN ──────────────────────────────────────── */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        {/* ========================================================================= */}
+        {/* 2. CENTER MAIN CONTENT                                                    */}
+        {/* ========================================================================= */}
+        <main className="dash-center-main">
 
-          {/* ── MOBILE QUICK ACCESS BAR (HIDDEN ON DESKTOP) ── */}
+          {/* ── WELCOME BANNER ── */}
           <div
-            className="mobile-quick-access"
             style={{
+              background: "linear-gradient(135deg, #FFF6F0 0%, #FFF0EA 100%)",
+              border: "1px solid #F3E5D8",
+              borderRadius: "16px",
+              padding: "1.25rem 1.5rem",
+              boxShadow: "0 2px 10px rgba(107,26,42,0.03)",
               display: "flex",
               alignItems: "center",
-              gap: "1rem",
-              background: "#fff",
-              border: "1px solid #E8D5B7",
-              borderRadius: "6px",
-              padding: "0.75rem 1rem",
-              marginBottom: "1rem",
+              justifyContent: "space-between",
+              position: "relative",
+              overflow: "hidden",
             }}
           >
-            <Link href={`/profile/${user.id}`}
-              style={{
-                width: "48px", height: "48px", borderRadius: "50%",
-                border: "2px solid #E8D5B7",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                overflow: "hidden", background: userPhoto ? "transparent" : "#DFDFDF",
-                flexShrink: 0
-              }}
-            >
-              {userPhoto
-                ? <img src={userPhoto} alt={user.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
-                : <svg width="32" height="32" viewBox="0 0 24 24" fill="none" style={{ marginBottom: "-4px" }}><circle cx="12" cy="8" r="5" fill="#FFFFFF" /><path d="M4 22c0-4.5 3.5-8 8-8s8 3.5 8 8" fill="#FFFFFF" /></svg>
-              }
-            </Link>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: "1rem", color: "#111" }}>{user.name}</div>
-              <div style={{ fontSize: "0.75rem", color: "#5C3040", marginTop: "2px" }}>{profileCode}</div>
+            <div>
+              <h1 style={{ fontSize: "clamp(1.25rem, 2.5vw, 1.5rem)", fontWeight: 800, color: "#2D1018", margin: "0 0 4px" }}>
+                {getGreeting()}, {user.name.split(" ")[0]}! 👋
+              </h1>
+              <p style={{ fontSize: "0.8125rem", color: "#7A5060", margin: 0 }}>
+                Here are a few matches selected based on your preferences.
+              </p>
             </div>
-            <Link href="/settings" style={{ padding: "0.5rem", color: "#6B1A2A" }}>
-              <Settings2 size={22} />
-            </Link>
-          </div>
 
-          {/* ── Match Stat Tiles ── */}
-          <div
-            className="dashboard-stats-grid"
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(2, 1fr)",
-              gap: "0.5rem",
-              marginBottom: "1rem",
-            }}
-          >
-            {STAT_TILES.map((tile) => (
-              <Link
-                key={tile.href}
-                href={tile.href}
-                style={{
-                  background: "#fff",
-                  border: "1px solid #E8D5B7",
-                  borderRadius: "6px",
-                  padding: "0.75rem 0.875rem",
-                  textDecoration: "none",
-                  display: "flex",
-                  flexDirection: "column",
-                  gap: "2px",
-                  transition: "box-shadow 0.15s, border-color 0.15s",
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "#6B1A2A";
-                  (e.currentTarget as HTMLElement).style.boxShadow = "0 2px 8px rgba(107,26,42,0.12)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLElement).style.borderColor = "#E8D5B7";
-                  (e.currentTarget as HTMLElement).style.boxShadow = "none";
-                }}
-              >
-                {tile.icon}
-                {loadingCounts ? (
-                  <span style={{ 
-                    display: "inline-block", 
-                    width: "32px", 
-                    height: "20px", 
-                    background: "#F2E8D6", 
-                    borderRadius: "4px", 
-                    animation: "pulse 1.5s infinite ease-in-out",
-                    margin: "2px 0"
-                  }} />
-                ) : (
-                  <span style={{ fontSize: "1.25rem", fontWeight: 700, color: "#6B1A2A", lineHeight: 1 }}>
-                    {tile.count}
-                  </span>
-                )}
-                <span style={{ fontSize: "0.6875rem", color: "#4A2030", lineHeight: 1.3 }}>{tile.label}</span>
-              </Link>
-            ))}
-          </div>
-
-          {/* Complete Your Profile OR 100% Complete banner */}
-          {missing.length > 0 ? (
             <div
               style={{
-                background: "#fff",
-                border: "1px solid #E8D5B7",
-                borderRadius: "6px",
-                padding: "1rem 1.125rem",
-                marginBottom: "1rem",
+                textAlign: "right",
+                fontFamily: "Georgia, 'Playfair Display', serif",
+                fontStyle: "italic",
+                color: "#A05A40",
+                fontSize: "0.875rem",
+                lineHeight: 1.25,
+                opacity: 0.9,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.625rem" }}>
-                <div>
-                  <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#111", margin: "0 0 3px" }}>Complete Your Profile</h2>
-                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span style={{ fontSize: "0.75rem", color: "#5C3040" }}>Profile completeness score {pct}%</span>
-                    <div style={{ width: "80px", height: "6px", background: "#E8D5B7", borderRadius: "3px", overflow: "hidden" }}>
-                      <div style={{ height: "100%", width: `${pct}%`, background: "#C8973A", borderRadius: "3px" }} />
-                    </div>
-                  </div>
-                </div>
-                <Link href="/profile/edit" style={{ fontSize: "0.75rem", color: "#6B1A2A", fontWeight: 600, textDecoration: "none" }}>
-                  Edit all &rarr;
-                </Link>
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                {missing.map((m) => (
-                  <Link
-                    key={m.href}
-                    href={m.href}
-                    style={{
-                      display: "flex", alignItems: "center", gap: "5px",
-                      padding: "0.5rem 0.875rem",
-                      background: m.label === "Set Partner Preferences" ? "#FBF6EC" : "#fff",
-                      border: m.label === "Set Partner Preferences" ? "1px solid #E0C070" : "1px solid #E8D5B7",
-                      borderRadius: "8px",
-                      color: m.label === "Set Partner Preferences" ? "#6B1A2A" : "#333",
-                      textDecoration: "none",
-                      fontSize: "0.875rem",
-                      fontWeight: m.label === "Set Partner Preferences" ? 700 : 500,
-                    }}
-                  >
-                    {m.icon}
-                    {m.label}
-                  </Link>
-                ))}
-              </div>
+              Better Matches<br />
+              <span style={{ fontSize: "0.8125rem", fontWeight: 700 }}>Brighter Tomorrows</span>
             </div>
-          ) : !hideCompleteBanner ? (
-            <div
+          </div>
+
+          {/* ── 5 SUMMARY / STATISTICS CARDS ── */}
+          <div className="stat-cards-grid">
+            {/* 1: New Matches */}
+            <Link
+              href="/matches?tab=newly_joined"
               style={{
-                position: "relative",
-                background: "linear-gradient(135deg, #E8F5E9, #F1F8E9)",
-                border: "1.5px solid #A5D6A7",
-                borderRadius: "6px",
-                padding: "1rem 1.25rem",
-                marginBottom: "1rem",
+                background: "#FFFFFF",
+                border: "1px solid #EFE8DE",
+                borderRadius: "12px",
+                padding: "0.875rem 0.75rem",
+                textDecoration: "none",
                 display: "flex",
                 alignItems: "center",
-                gap: "1rem",
+                justifyContent: "space-between",
+                boxShadow: "0 2px 8px rgba(107,26,42,0.02)",
+                transition: "border-color 0.15s, transform 0.15s",
               }}
             >
-              <button 
-                onClick={() => { setHideCompleteBanner(true); localStorage.setItem('hideCompleteBanner', 'true'); }} 
-                style={{ position: "absolute", top: "8px", right: "8px", background: "none", border: "none", cursor: "pointer", color: "#388E3C" }}
-              >
-                <X size={16} />
-              </button>
-              <div style={{
-                width: "44px", height: "44px", borderRadius: "50%",
-                background: "#2E7D32", display: "flex", alignItems: "center",
-                justifyContent: "center", flexShrink: 0,
-              }}>
-                <CheckCircle size={24} color="#fff" fill="#2E7D32" stroke="#fff" />
-              </div>
-              <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 700, color: "#1B5E20", fontSize: "1rem" }}>
-                  🎉 Profile 100% Complete!
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#FEF2F4", display: "flex", alignItems: "center", justifyContent: "center", color: "#C84B60", flexShrink: 0 }}>
+                  <Heart size={16} />
                 </div>
-                <div style={{ fontSize: "0.8125rem", color: "#388E3C", marginTop: "2px" }}>
-                  Your profile is fully set up. You&apos;re getting maximum visibility to matches!
+                <div>
+                  <div style={{ fontSize: "0.6875rem", color: "#8B6070", fontWeight: 600 }}>New Matches</div>
+                  <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "#2D1018", lineHeight: 1.1 }}>
+                    {loadingCounts ? "—" : matchCounts.newMatches}
+                  </div>
                 </div>
               </div>
-              <Link href={`/profile/${user.id}`} style={{
-                padding: "0.4375rem 1rem", background: "#2E7D32",
-                color: "#fff", borderRadius: "20px", fontWeight: 700,
-                fontSize: "0.8125rem", textDecoration: "none", flexShrink: 0,
-              }}>
-                View Profile
-              </Link>
-            </div>
-          ) : null}
+              <ChevronRight size={14} color="#C0A8B0" />
+            </Link>
 
-          {/* Daily Recommendations */}
+            {/* 2: Profile Views */}
+            <Link
+              href="/matches?tab=viewed_you"
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid #EFE8DE",
+                borderRadius: "12px",
+                padding: "0.875rem 0.75rem",
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                boxShadow: "0 2px 8px rgba(107,26,42,0.02)",
+                transition: "border-color 0.15s, transform 0.15s",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#F5EFFE", display: "flex", alignItems: "center", justifyContent: "center", color: "#7B42BC", flexShrink: 0 }}>
+                  <Eye size={16} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.6875rem", color: "#8B6070", fontWeight: 600 }}>Profile Views</div>
+                  <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "#2D1018", lineHeight: 1.1 }}>
+                    {loadingCounts ? "—" : matchCounts.whoViewedYou}
+                  </div>
+                </div>
+              </div>
+              <ChevronRight size={14} color="#C0A8B0" />
+            </Link>
+
+            {/* 3: New Interests */}
+            <Link
+              href="/interests"
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid #EFE8DE",
+                borderRadius: "12px",
+                padding: "0.875rem 0.75rem",
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                boxShadow: "0 2px 8px rgba(107,26,42,0.02)",
+                transition: "border-color 0.15s, transform 0.15s",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#FFF0F0", display: "flex", alignItems: "center", justifyContent: "center", color: "#D32F2F", flexShrink: 0 }}>
+                  <Mail size={16} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.6875rem", color: "#8B6070", fontWeight: 600 }}>New Interests</div>
+                  <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "#2D1018", lineHeight: 1.1 }}>
+                    {loadingExtras ? "—" : receivedInterests.length}
+                  </div>
+                </div>
+              </div>
+              <ChevronRight size={14} color="#C0A8B0" />
+            </Link>
+
+            {/* 4: Shortlisted */}
+            <Link
+              href="/shortlisted"
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid #EFE8DE",
+                borderRadius: "12px",
+                padding: "0.875rem 0.75rem",
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                boxShadow: "0 2px 8px rgba(107,26,42,0.02)",
+                transition: "border-color 0.15s, transform 0.15s",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#FFF9E6", display: "flex", alignItems: "center", justifyContent: "center", color: "#D49800", flexShrink: 0 }}>
+                  <Star size={16} fill="#D49800" strokeWidth={0} />
+                </div>
+                <div>
+                  <div style={{ fontSize: "0.6875rem", color: "#8B6070", fontWeight: 600 }}>Shortlisted</div>
+                  <div style={{ fontSize: "1.125rem", fontWeight: 800, color: "#2D1018", lineHeight: 1.1 }}>
+                    {loadingCounts ? "—" : matchCounts.shortlistedByYou}
+                  </div>
+                </div>
+              </div>
+              <ChevronRight size={14} color="#C0A8B0" />
+            </Link>
+
+            {/* 5: View All Matches */}
+            <Link
+              href="/matches"
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid #EFE8DE",
+                borderRadius: "12px",
+                padding: "0.875rem 0.75rem",
+                textDecoration: "none",
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                boxShadow: "0 2px 8px rgba(107,26,42,0.02)",
+                transition: "border-color 0.15s, transform 0.15s",
+              }}
+            >
+              <div style={{ width: "32px", height: "32px", borderRadius: "50%", background: "#FEF2F4", display: "flex", alignItems: "center", justifyContent: "center", color: "#6B1A2A", flexShrink: 0 }}>
+                <Users2 size={16} />
+              </div>
+              <div style={{ minWidth: 0, flex: 1 }}>
+                <div style={{ fontSize: "0.6875rem", fontWeight: 800, color: "#6B1A2A", display: "flex", alignItems: "center", gap: "3px" }}>
+                  View All Matches &rarr;
+                </div>
+                <div style={{ fontSize: "0.625rem", color: "#8B6070", lineHeight: 1.2, marginTop: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  Explore more profiles
+                </div>
+              </div>
+            </Link>
+          </div>
+
+          {/* ── RECOMMENDED FOR YOU CAROUSEL ── */}
           <div
             style={{
-              background: "#fff",
-              border: "1px solid #e0e0e0",
-              borderRadius: "6px",
-              padding: "1rem 1.125rem",
+              background: "#FFFFFF",
+              border: "1px solid #EFE8DE",
+              borderRadius: "16px",
+              padding: "1.25rem 1.25rem",
+              boxShadow: "0 2px 12px rgba(107,26,42,0.03)",
             }}
           >
-            {/* Heading row with countdown + View All */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "0.75rem", gap: "0.5rem" }}>
-              <div style={{ minWidth: 0 }}>
-                <h2 style={{ fontSize: "1rem", fontWeight: 700, color: "#111", margin: "0 0 2px" }}>Daily Recommendations</h2>
-                <p style={{ fontSize: "0.8125rem", color: "#888", margin: 0 }}>Recommended matches for today</p>
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1rem" }}>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Sparkles size={17} color="#6B1A2A" />
+                  <h2 style={{ fontSize: "1.0625rem", fontWeight: 800, color: "#2D1018", margin: 0 }}>
+                    Recommended For You
+                  </h2>
+                </div>
+                <p style={{ fontSize: "0.75rem", color: "#8B6070", margin: "2px 0 0" }}>
+                  Based on your preferences and recent activity
+                </p>
               </div>
 
-              <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", flexShrink: 0 }}>
-                {/* View All link */}
-                {!loadingRecs && dailyRecs.length > 0 && (
-                  <Link
-                    href="/daily-recs"
-                    style={{
-                      fontSize: "0.8125rem", fontWeight: 700,
-                      color: "var(--primary)", textDecoration: "none",
-                      whiteSpace: "nowrap",
-                      display: "flex", alignItems: "center", gap: "3px",
-                    }}
-                  >
-                    View All <ArrowRight size={13} />
-                  </Link>
-                )}
-                {/* Countdown */}
-                <div
-                  style={{
-                    background: "#2e7d32",
-                    color: "#fff",
-                    padding: "0.25rem 0.625rem",
-                    borderRadius: "4px",
-                    fontSize: "0.6875rem",
-                    fontWeight: 700,
-                    textAlign: "center",
-                    flexShrink: 0,
-                  }}
-                >
-                  <div style={{ fontSize: "0.5625rem", fontWeight: 400, letterSpacing: "0.03em" }}>Refreshes in</div>
-                  {timeLeft}
+              <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", background: "#FBF7F2", border: "1px solid #EBE0D5", borderRadius: "14px", padding: "3px 8px", fontSize: "0.6875rem", fontWeight: 700, color: "#6B1A2A" }}>
+                  Match Score <Info size={11} />
                 </div>
+                <button
+                  onClick={() => scrollRecs("left")}
+                  style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFFFFF", border: "1px solid #E5D5C5", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#6B1A2A" }}
+                >
+                  <ChevronLeft size={14} />
+                </button>
+                <button
+                  onClick={() => scrollRecs("right")}
+                  style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFFFFF", border: "1px solid #E5D5C5", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#6B1A2A" }}
+                >
+                  <ChevronRight size={14} />
+                </button>
               </div>
             </div>
 
-            {/* Horizontal scroll of profiles */}
+            {/* Carousel Container */}
             <div
+              ref={recScrollRef}
+              className="recs-carousel-track"
               style={{
                 display: "flex",
-                gap: "0.75rem",
+                gap: "0.875rem",
                 overflowX: "auto",
-                paddingBottom: "0.5rem",
+                scrollSnapType: "x mandatory",
+                paddingBottom: "0.25rem",
               }}
             >
-              {loadingRecs
-                ? Array.from({ length: 4 }).map((_, i) => (
+              {loadingRecs ? (
+                Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} style={{ width: "190px", height: "300px", borderRadius: "12px", background: "#F5EDE5", flexShrink: 0, animation: "pulse 1.5s infinite" }} />
+                ))
+              ) : dailyRecs.length === 0 ? (
+                <div style={{ padding: "2rem", textAlign: "center", width: "100%", color: "#8B6070", fontSize: "0.875rem" }}>
+                  No match recommendations available today. Try adjusting your partner preferences!
+                </div>
+              ) : (
+                dailyRecs.map((p) => {
+                  const age = calcAge(p.dob);
+                  const score = computeMatchScore(p);
+                  const pCode = `ETM${p.id.replace(/-/g, "").slice(0, 5).toUpperCase()}`;
+                  const isShort = shortlistedIds.has(p.id);
+
+                  return (
                     <div
-                      key={i}
+                      key={p.id}
                       style={{
-                        width: "125px", flexShrink: 0,
-                        background: "#f0f0f0", borderRadius: "6px",
-                        height: "175px", animation: "pulse 1.5s ease-in-out infinite",
+                        width: "190px",
+                        flexShrink: 0,
+                        background: "#FFFFFF",
+                        border: "1px solid #EFE8DE",
+                        borderRadius: "12px",
+                        overflow: "hidden",
+                        display: "flex",
+                        flexDirection: "column",
+                        scrollSnapAlign: "start",
+                        boxShadow: "0 2px 8px rgba(107,26,42,0.03)",
                       }}
-                    />
-                  ))
-                : dailyRecs.slice(0, 4).map((p, idx) => {
-                    const photo = p.photoUrl;
-                    const age = p.dob
-                      ? Math.floor((Date.now() - new Date(p.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000))
-                      : 0;
-                    return (
-                      <Link
-                        key={p.id}
-                        href={`/profile/${p.id}`}
-                        style={{
-                          width: "125px", flexShrink: 0,
-                          display: "block", textDecoration: "none",
-                        }}
-                      >
-                        {photo ? (
-                          <img
-                            src={photo}
-                            alt={p.name}
-                            style={{
-                              width: "125px", height: "160px",
-                              objectFit: "cover", objectPosition: "top",
-                              borderRadius: "6px", display: "block",
-                            }}
-                          />
+                    >
+                      {/* Photo + Overlay Badges */}
+                      <div style={{ position: "relative", height: "165px", width: "100%", background: "#F2E8DC", overflow: "hidden" }}>
+                        {p.photoUrl ? (
+                          <img src={p.photoUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top" }} />
                         ) : (
-                          <div
+                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", color: "#C0A8B0" }}>
+                            <Users size={44} />
+                          </div>
+                        )}
+
+                        {/* Match Score Badge */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: "6px",
+                            right: "6px",
+                            background: "#E6F4EA",
+                            color: "#137333",
+                            fontSize: "0.625rem",
+                            fontWeight: 800,
+                            padding: "2px 6px",
+                            borderRadius: "10px",
+                            boxShadow: "0 1px 4px rgba(0,0,0,0.1)",
+                          }}
+                        >
+                          {score}% Match
+                        </div>
+                      </div>
+
+                      {/* Info Body */}
+                      <div style={{ padding: "0.625rem 0.625rem 0.75rem", display: "flex", flexDirection: "column", flex: 1 }}>
+                        <div style={{ fontWeight: 800, fontSize: "0.875rem", color: "#2D1018", marginBottom: "1px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {p.name}
+                        </div>
+                        <div style={{ fontSize: "0.6875rem", color: "#6B5060", marginBottom: "2px" }}>
+                          {age > 0 ? `${age} yrs` : "26 yrs"} • {p.city || "Tamil Nadu"}
+                        </div>
+                        <div style={{ fontSize: "0.6875rem", color: "#2D1018", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", marginBottom: "2px" }}>
+                          {p.occupation || "Professional"}
+                        </div>
+                        <div style={{ fontSize: "0.6875rem", color: "#8B6070", marginBottom: "2px" }}>
+                          {p.education || "Graduate"} • {p.religion || "Hindu"}
+                        </div>
+                        <div style={{ fontSize: "0.6875rem", color: "#8B6070", marginBottom: "0.625rem" }}>
+                          {p.maritalStatus || "Never Married"}
+                        </div>
+
+                        {/* Action Buttons */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginTop: "auto" }}>
+                          <Link
+                            href={`/profile/${p.id}?from=home`}
                             style={{
-                              width: "125px", height: "160px",
-                              background: "#f5f5f5",
+                              flex: 1,
+                              background: "#6B1A2A",
+                              color: "#FFFFFF",
+                              padding: "0.375rem 0.5rem",
+                              borderRadius: "6px",
+                              fontSize: "0.6875rem",
+                              fontWeight: 700,
+                              textDecoration: "none",
+                              textAlign: "center",
+                              transition: "background 0.15s",
+                            }}
+                          >
+                            View Profile
+                          </Link>
+                          <button
+                            onClick={(e) => handleToggleShortlist(e, p.id)}
+                            title={isShort ? "Remove Shortlist" : "Shortlist"}
+                            style={{
+                              width: "28px",
+                              height: "28px",
+                              borderRadius: "6px",
+                              border: "1px solid #E5D5C5",
+                              background: isShort ? "#FEF2F4" : "#FFFFFF",
+                              color: isShort ? "#6B1A2A" : "#8B6070",
                               display: "flex",
                               alignItems: "center",
                               justifyContent: "center",
-                              borderRadius: "6px",
-                              color: "#ccc"
+                              cursor: "pointer",
+                              flexShrink: 0,
                             }}
                           >
-                            <User size={48} strokeWidth={1.5} />
-                          </div>
-                        )}
-                        <div style={{ marginTop: "5px", fontSize: "0.8125rem", fontWeight: 600, color: "#111", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                          {p.name}
+                            <Heart size={14} fill={isShort ? "#6B1A2A" : "none"} />
+                          </button>
                         </div>
-                        <div style={{ fontSize: "0.75rem", color: "#888" }}>
-                          {[age > 0 ? `${age} Yrs` : null, p.height].filter(Boolean).join(", ")}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* ── TWO COLUMN ROW: People Interested in You & Who Viewed You ── */}
+          <div className="two-column-split">
+
+            {/* Left Box: People Interested in You */}
+            <div
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid #EFE8DE",
+                borderRadius: "14px",
+                padding: "1rem 1.125rem",
+                boxShadow: "0 2px 10px rgba(107,26,42,0.03)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Heart size={16} color="#6B1A2A" />
+                  <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#2D1018", margin: 0 }}>
+                    People Interested in You
+                  </h3>
+                </div>
+                <Link href="/interests" style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#6B1A2A", textDecoration: "none" }}>
+                  View All &rarr;
+                </Link>
+              </div>
+
+              <p style={{ fontSize: "0.6875rem", color: "#8B6070", margin: "0 0 0.75rem" }}>
+                {receivedInterests.length} member{receivedInterests.length === 1 ? "" : "s"} expressed interest in your profile.
+              </p>
+
+              <div style={{ display: "flex", gap: "0.625rem", overflowX: "auto" }}>
+                {receivedInterests.length === 0 ? (
+                  <div style={{ padding: "1.25rem 0.5rem", color: "#9E7A85", fontSize: "0.75rem", textAlign: "center", width: "100%" }}>
+                    No pending interests right now. Keep your profile updated!
+                  </div>
+                ) : (
+                  receivedInterests.slice(0, 3).map((item) => {
+                    const prof = item.profile;
+                    const name = prof?.name || "Member";
+                    const age = prof?.dob ? calcAge(prof.dob) : 27;
+
+                    return (
+                      <div
+                        key={item.id}
+                        style={{
+                          flex: "1 1 0",
+                          minWidth: "115px",
+                          background: "#FAF7F2",
+                          border: "1px solid #EFE8DE",
+                          borderRadius: "10px",
+                          padding: "0.625rem 0.5rem",
+                          textAlign: "center",
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                        }}
+                      >
+                        <div style={{ width: "38px", height: "38px", borderRadius: "50%", overflow: "hidden", background: "#EDE5DC", marginBottom: "4px" }}>
+                          {prof?.photoUrl ? (
+                            <img src={prof.photoUrl} alt={name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ) : (
+                            <Users size={20} color="#A08088" style={{ margin: "9px auto 0" }} />
+                          )}
+                        </div>
+                        <div style={{ fontWeight: 800, fontSize: "0.75rem", color: "#2D1018", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%" }}>
+                          {name}
+                        </div>
+                        <div style={{ fontSize: "0.625rem", color: "#8B6070" }}>{age} yrs • {prof?.city || "Chennai"}</div>
+                        <div style={{ fontSize: "0.625rem", color: "#6B1A2A", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", width: "100%", marginBottom: "6px" }}>
+                          {prof?.occupation || "Professional"}
+                        </div>
+
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px", width: "100%", marginTop: "auto" }}>
+                          <Link
+                            href={prof ? `/profile/${prof.id}?from=home` : "/interests"}
+                            style={{
+                              padding: "2px 0",
+                              fontSize: "0.625rem",
+                              fontWeight: 700,
+                              color: "#6B1A2A",
+                              border: "1px solid #E5D5C5",
+                              borderRadius: "4px",
+                              background: "#FFFFFF",
+                              textDecoration: "none",
+                            }}
+                          >
+                            View Profile
+                          </Link>
+                          <button
+                            onClick={() => handleAcceptInterest(item.id, name)}
+                            style={{
+                              padding: "2px 0",
+                              fontSize: "0.625rem",
+                              fontWeight: 700,
+                              color: "#FFFFFF",
+                              border: "none",
+                              borderRadius: "4px",
+                              background: "#6B1A2A",
+                              cursor: "pointer",
+                            }}
+                          >
+                            Accept
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Right Box: Who Viewed You */}
+            <div
+              style={{
+                background: "#FFFFFF",
+                border: "1px solid #EFE8DE",
+                borderRadius: "14px",
+                padding: "1rem 1.125rem",
+                boxShadow: "0 2px 10px rgba(107,26,42,0.03)",
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <Eye size={16} color="#6B1A2A" />
+                  <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#2D1018", margin: 0 }}>
+                    Who Viewed You
+                  </h3>
+                </div>
+                <Link href="/matches?tab=viewed_you" style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#6B1A2A", textDecoration: "none" }}>
+                  View Visitors &rarr;
+                </Link>
+              </div>
+
+              <p style={{ fontSize: "0.6875rem", color: "#8B6070", margin: "0 0 0.75rem" }}>
+                {viewedMeProfiles.length} person{viewedMeProfiles.length === 1 ? "" : "s"} viewed your profile.
+              </p>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem" }}>
+                {viewedMeProfiles.length === 0 ? (
+                  <div style={{ padding: "1.25rem 0.5rem", color: "#9E7A85", fontSize: "0.75rem", textAlign: "center" }}>
+                    No recent profile visitors yet. Boost your activity to increase profile views!
+                  </div>
+                ) : (
+                  viewedMeProfiles.slice(0, 2).map((p) => {
+                    const age = calcAge(p.dob);
+
+                    return (
+                      <Link
+                        key={p.id}
+                        href={`/profile/${p.id}?from=home`}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: "10px",
+                          padding: "0.5rem",
+                          background: "#FAF7F2",
+                          border: "1px solid #EFE8DE",
+                          borderRadius: "10px",
+                          textDecoration: "none",
+                        }}
+                      >
+                        <div style={{ width: "42px", height: "42px", borderRadius: "50%", overflow: "hidden", background: "#EDE5DC", flexShrink: 0 }}>
+                          {p.photoUrl ? (
+                            <img src={p.photoUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                          ) : (
+                            <Users size={22} color="#A08088" style={{ margin: "10px auto 0" }} />
+                          )}
+                        </div>
+                        <div style={{ minWidth: 0, flex: 1 }}>
+                          <div style={{ fontWeight: 800, fontSize: "0.8125rem", color: "#2D1018" }}>{p.name}</div>
+                          <div style={{ fontSize: "0.6875rem", color: "#6B5060" }}>{age > 0 ? `${age} yrs` : "28 yrs"} • {p.city || "Chennai"}</div>
+                          <div style={{ fontSize: "0.6875rem", color: "#2D1018", fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {p.occupation || "Software Engineer"}
+                          </div>
+                          <div style={{ fontSize: "0.625rem", color: "#A08088" }}>Viewed your profile • Recently</div>
                         </div>
                       </Link>
                     );
                   })
-              }
+                )}
+              </div>
+            </div>
 
-              {/* Arrow button to daily-recs — shown when more than 4 profiles exist */}
-              {!loadingRecs && dailyRecs.length > 4 && (
-                <Link
-                  href="/daily-recs"
-                  style={{
-                    width: "44px", flexShrink: 0,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    background: "#f5f5f5", border: "1px solid #e0e0e0",
-                    borderRadius: "6px", height: "160px",
-                    textDecoration: "none",
-                  }}
-                  title="View all daily recommendations"
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#555" strokeWidth="2.5">
-                    <polyline points="9 18 15 12 9 6"/>
-                  </svg>
-                </Link>
-              )}
+          </div>
+
+          {/* ── RECENTLY VIEWED STRIP ── */}
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #EFE8DE",
+              borderRadius: "14px",
+              padding: "1rem 1.125rem",
+              boxShadow: "0 2px 10px rgba(107,26,42,0.03)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.75rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <Clock size={16} color="#6B1A2A" />
+                <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#2D1018", margin: 0 }}>
+                  Recently Viewed
+                </h3>
+              </div>
+              <Link href="/matches?tab=viewed_by_you" style={{ fontSize: "0.6875rem", fontWeight: 700, color: "#6B1A2A", textDecoration: "none" }}>
+                View All &rarr;
+              </Link>
+            </div>
+
+            <p style={{ fontSize: "0.6875rem", color: "#8B6070", margin: "0 0 0.75rem" }}>
+              Continue exploring profiles you recently viewed.
+            </p>
+
+            <div style={{ display: "flex", gap: "0.75rem", overflowX: "auto" }}>
+              {(viewedByMeProfiles.length > 0 ? viewedByMeProfiles : dailyRecs).slice(0, 4).map((p) => {
+                const age = calcAge(p.dob);
+                const isShort = shortlistedIds.has(p.id);
+
+                return (
+                  <div
+                    key={p.id}
+                    style={{
+                      flex: "1 1 0",
+                      minWidth: "145px",
+                      background: "#FAF7F2",
+                      border: "1px solid #EFE8DE",
+                      borderRadius: "10px",
+                      padding: "0.5rem 0.625rem",
+                      display: "flex",
+                      alignItems: "center",
+                      gap: "8px",
+                    }}
+                  >
+                    <Link href={`/profile/${p.id}?from=home`} style={{ width: "34px", height: "34px", borderRadius: "50%", overflow: "hidden", background: "#EDE5DC", flexShrink: 0 }}>
+                      {p.photoUrl ? (
+                        <img src={p.photoUrl} alt={p.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      ) : (
+                        <Users size={18} color="#A08088" style={{ margin: "8px auto 0" }} />
+                      )}
+                    </Link>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <Link href={`/profile/${p.id}?from=home`} style={{ fontWeight: 800, fontSize: "0.75rem", color: "#2D1018", textDecoration: "none", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {p.name}
+                      </Link>
+                      <div style={{ fontSize: "0.625rem", color: "#8B6070" }}>
+                        {age > 0 ? `${age} yrs` : "26 yrs"} • {p.city || "Tamil Nadu"}
+                      </div>
+                    </div>
+                    <button
+                      onClick={(e) => handleToggleShortlist(e, p.id)}
+                      style={{ border: "none", background: "transparent", cursor: "pointer", color: isShort ? "#6B1A2A" : "#B098A0", padding: "2px" }}
+                    >
+                      <Heart size={14} fill={isShort ? "#6B1A2A" : "none"} />
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
+
+        </main>
+
+        {/* ========================================================================= */}
+        {/* 3. RIGHT SIDEBAR                                                          */}
+        {/* ========================================================================= */}
+        <aside className="dash-right-sidebar">
+
+          {/* ── CARD 1: Premium Membership ── */}
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #EFE8DE",
+              borderRadius: "14px",
+              padding: "1.25rem 1.125rem",
+              boxShadow: "0 2px 10px rgba(107,26,42,0.03)",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
+              <Crown size={18} color="#C8973A" fill="#C8973A" />
+              <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#2D1018", margin: 0 }}>
+                Premium Membership
+              </h3>
+            </div>
+            <p style={{ fontSize: "0.6875rem", color: "#8B6070", margin: "0 0 0.875rem", lineHeight: 1.35 }}>
+              Unlock more features for a better matrimonial experience.
+            </p>
+
+            {/* Checklist */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "1rem" }}>
+              {[
+                "Unlimited messaging",
+                "Advanced search filters",
+                "View profile visitors",
+                "Priority support",
+                "Assisted matchmaking",
+              ].map((benefit) => (
+                <div key={benefit} style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "0.75rem", color: "#3D2028", fontWeight: 500 }}>
+                  <Check size={13} color="#C84B60" strokeWidth={3} />
+                  {benefit}
+                </div>
+              ))}
+            </div>
+
+            <Link
+              href="/membership"
+              style={{
+                display: "block",
+                background: "#6B1A2A",
+                color: "#FFFFFF",
+                padding: "0.5rem 1rem",
+                borderRadius: "20px",
+                fontSize: "0.8125rem",
+                fontWeight: 700,
+                textDecoration: "none",
+                textAlign: "center",
+                transition: "background 0.15s",
+              }}
+            >
+              Upgrade Now &rarr;
+            </Link>
+          </div>
+
+          {/* ── CARD 2: Complete Your Profile ── */}
+          <div
+            style={{
+              background: "#FFFFFF",
+              border: "1px solid #EFE8DE",
+              borderRadius: "14px",
+              padding: "1.25rem 1.125rem",
+              boxShadow: "0 2px 10px rgba(107,26,42,0.03)",
+            }}
+          >
+            <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#2D1018", margin: "0 0 0.75rem" }}>
+              Complete Your Profile
+            </h3>
+
+            {/* Gauge row */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "0.875rem" }}>
+              <div style={{ position: "relative", width: "48px", height: "48px", flexShrink: 0 }}>
+                <svg width="48" height="48" viewBox="0 0 48 48">
+                  <circle cx="24" cy="24" r="19" fill="none" stroke="#EFE8DE" strokeWidth="4.5" />
+                  <circle
+                    cx="24"
+                    cy="24"
+                    r="19"
+                    fill="none"
+                    stroke="#2E7D32"
+                    strokeWidth="4.5"
+                    strokeDasharray={2 * Math.PI * 19}
+                    strokeDashoffset={2 * Math.PI * 19 * (1 - pct / 100)}
+                    strokeLinecap="round"
+                    transform="rotate(-90 24 24)"
+                  />
+                </svg>
+                <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", fontWeight: 800, color: "#2E7D32" }}>
+                  {pct}%
+                </div>
+              </div>
+              <div style={{ fontSize: "0.6875rem", color: "#8B6070", lineHeight: 1.35 }}>
+                Complete your profile to get better matches.
+              </div>
+            </div>
+
+            {/* Checklist */}
+            <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "1rem" }}>
+              {[
+                { label: "Basic details", done: hasBasicDetails },
+                { label: "Education", done: hasEducation },
+                { label: "Career", done: hasCareer },
+                { label: "Partner preferences", done: hasPartnerPrefs },
+                { label: "Add family details", done: hasFamilyDetails },
+                { label: "Add more photos", done: hasMorePhotos },
+              ].map((item) => (
+                <div key={item.label} style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "0.75rem", color: item.done ? "#2D1018" : "#8B6070" }}>
+                  {item.done ? (
+                    <CheckCircle2 size={14} color="#2E7D32" />
+                  ) : (
+                    <Circle size={14} color="#C5B0B8" />
+                  )}
+                  {item.label}
+                </div>
+              ))}
+            </div>
+
+            <Link
+              href="/profile/edit"
+              style={{
+                display: "block",
+                background: "#6B1A2A",
+                color: "#FFFFFF",
+                padding: "0.5rem 1rem",
+                borderRadius: "20px",
+                fontSize: "0.8125rem",
+                fontWeight: 700,
+                textDecoration: "none",
+                textAlign: "center",
+              }}
+            >
+              Complete Profile &rarr;
+            </Link>
+          </div>
+
+          {/* ── CARD 3: Your Story Matters ── */}
+          <div
+            style={{
+              background: "#FAF7F2",
+              border: "1px solid #EFE8DE",
+              borderRadius: "14px",
+              padding: "1.125rem 1.125rem",
+              boxShadow: "0 2px 10px rgba(107,26,42,0.03)",
+              textAlign: "center",
+            }}
+          >
+            <h3 style={{ fontFamily: "Georgia, 'Playfair Display', serif", fontSize: "1.0625rem", fontWeight: 700, color: "#6B1A2A", margin: "0 0 4px" }}>
+              Your Story Matters
+            </h3>
+            <p style={{ fontSize: "0.6875rem", color: "#7A5060", margin: "0 0 0.625rem", lineHeight: 1.35 }}>
+              Find a partner who shares your values, dreams and future.
+            </p>
+
+            <div style={{ height: "115px", borderRadius: "10px", overflow: "hidden", margin: "0 0 0.75rem", border: "1px solid #EFE8DE" }}>
+              <img
+                src="/images/Reception.jpeg"
+                alt="Elite Tamil Matrimony"
+                style={{ width: "100%", height: "100%", objectFit: "cover" }}
+              />
+            </div>
+
+            <Link
+              href="/matches"
+              style={{
+                display: "inline-block",
+                padding: "0.375rem 1rem",
+                border: "1px solid #E5D5C5",
+                borderRadius: "20px",
+                background: "#FFFFFF",
+                color: "#6B1A2A",
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                textDecoration: "none",
+              }}
+            >
+              Explore Matches &rarr;
+            </Link>
+          </div>
+
+        </aside>
+
       </div>
+
       <ConfirmDialog
         isOpen={switchConfirmOpen}
         title="Switch Account"
@@ -1215,7 +1885,7 @@ function GuestLatestProfiles() {
 
         {loading ? (
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(170px, 1fr))", gap: "1rem" }}>
-            {[1,2,3,4,5,6].map((i) => (
+            {[1, 2, 3, 4, 5, 6].map((i) => (
               <div key={i} style={{ background: "#f5f5f5", borderRadius: "var(--radius-lg)", height: "240px", animation: "pulse 1.5s ease-in-out infinite" }} />
             ))}
           </div>
@@ -1246,7 +1916,7 @@ function GuestLatestProfiles() {
               }}
             >
               {profiles.map((profile) => {
-                const age = profile.dob ? Math.floor((Date.now() - new Date(profile.dob).getTime()) / (365.25*24*60*60*1000)) : 0;
+                const age = profile.dob ? Math.floor((Date.now() - new Date(profile.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)) : 0;
                 return (
                   <Link
                     key={profile.id}
@@ -1313,9 +1983,120 @@ function GuestLatestProfiles() {
   );
 }
 
-// ── Guest Success Stories (DB-backed, shown only if stories exist) ─────────────
+// ── Guest Success Stories (DB-backed, fallback to default stories) ─────────────
+const DEFAULT_GUEST_STORIES = [
+  {
+    id: "default-1",
+    name: "Mr. Velmurugan & Mrs. Velmurugan",
+    city: "Chennai, Tamil Nadu",
+    married: "September 2026",
+    story: "Pilot, son of a retired Senior Bureaucrat and married in Chennai with the blessings of both families.",
+    photo_url: "https://images.unsplash.com/photo-1583939003579-730e3918a45a?auto=format&fit=crop&w=800&q=80",
+  },
+  {
+    id: "default-2",
+    name: "Mr. Karthik & Mrs. Anitha",
+    city: "Coimbatore, Tamil Nadu",
+    married: "August 2026",
+    story: "Software Architect & Doctor who found their perfect alignment of values, family traditions, and life goals through Elite Tamil Matrimony.",
+    photo_url: "https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80",
+  },
+  {
+    id: "default-3",
+    name: "Mr. Sundar & Mrs. Priyadarshini",
+    city: "Madurai, Tamil Nadu",
+    married: "July 2026",
+  },
+];
+
+// ── Hero Dynamic Success Story Overlay (reuses exact same database/data source) ──
+function HeroSuccessStoryCard() {
+  const [topStory, setTopStory] = useState<any>(null);
+
+  useEffect(() => {
+    async function loadStory() {
+      try {
+        const { data, error } = await supabase
+          .from("success_stories")
+          .select("*")
+          .eq("is_visible", true)
+          .order("created_at", { ascending: false })
+          .limit(1);
+        if (!error && data && data.length > 0) {
+          setTopStory(data[0]);
+        } else {
+          setTopStory(DEFAULT_GUEST_STORIES[0]);
+        }
+      } catch {
+        setTopStory(DEFAULT_GUEST_STORIES[0]);
+      }
+    }
+    loadStory();
+  }, []);
+
+  if (!topStory) return null;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: "16px",
+        left: "16px",
+        right: "16px",
+        background: "rgba(255, 255, 255, 0.94)",
+        backdropFilter: "blur(8px)",
+        borderRadius: "16px",
+        padding: "0.875rem 1rem",
+        border: "1px solid rgba(255, 255, 255, 0.8)",
+        boxShadow: "0 8px 24px rgba(107,26,42,0.18)",
+        display: "flex",
+        alignItems: "center",
+        gap: "0.875rem",
+      }}
+    >
+      <div
+        style={{
+          width: "44px",
+          height: "44px",
+          borderRadius: "50%",
+          background: "var(--primary-light)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "var(--primary)",
+          flexShrink: 0,
+        }}
+      >
+        <Heart size={22} fill="var(--primary)" />
+      </div>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--text-dark)", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {topStory.name}
+        </div>
+        <div style={{ fontSize: "0.75rem", color: "var(--primary)", fontWeight: 600 }}>
+          {topStory.city || "Happy Tamil Couple"}
+        </div>
+      </div>
+      <Link
+        href="/success-stories"
+        style={{
+          fontSize: "0.75rem",
+          fontWeight: 700,
+          color: "#fff",
+          background: "var(--primary)",
+          padding: "0.375rem 0.75rem",
+          borderRadius: "var(--radius-full)",
+          textDecoration: "none",
+          flexShrink: 0,
+        }}
+      >
+        Story →
+      </Link>
+    </div>
+  );
+}
+
 function GuestSuccessStories() {
-  const [storyModal, setStoryModal] = useState<any>(null);
   const [stories, setStories] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -1327,13 +2108,13 @@ function GuestSuccessStories() {
           .select("*")
           .eq("is_visible", true)
           .order("created_at", { ascending: false });
-        if (!error && data) {
+        if (!error && data && data.length > 0) {
           setStories(data);
         } else {
-          setStories([]);
+          setStories(DEFAULT_GUEST_STORIES);
         }
       } catch {
-        setStories([]);
+        setStories(DEFAULT_GUEST_STORIES);
       } finally {
         setLoading(false);
       }
@@ -1341,7 +2122,7 @@ function GuestSuccessStories() {
     loadStories();
   }, []);
 
-  if (loading || stories.length === 0) return null;
+  if (loading) return null;
 
   return (
     <section style={{ background: "#fff", borderTop: "1px solid var(--border-light)", padding: "3rem 0" }}>
@@ -1450,122 +2231,211 @@ export default function HomePage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "var(--bg-page)", paddingTop: "64px" }}>
+      <main style={{ background: "var(--bg-page)", paddingTop: 0 }}>
 
-        {/* =================== HERO =================== */}
-        <section style={{ background: "var(--bg-page)", padding: "2rem 0 1.5rem" }}>
-          <div className="container">
-            <div className="hero-inner">
-              {/* Left Column: Text + Image (Desktop only for image) */}
-              <div className="hero-left">
-                <h1 className="hero-text" style={{
-                  fontSize: "clamp(1.25rem, 4vw, 2rem)",
-                  fontWeight: 900,
-                  color: "var(--text-dark)",
-                  lineHeight: 1.25,
-                  marginBottom: "1.5rem",
-                }}>
-                  A new{" "}
-                  <span style={{ color: "var(--primary)" }}>dedicated platform</span>
-                  {" "}for Tamil matrimony
+        {/* =================== HERO SECTION (FULL WIDTH BANNER WITH DECOR BACKGROUND) =================== */}
+        <section
+          className="hero-banner-full"
+          style={{
+            position: "relative",
+            background: "linear-gradient(90deg, rgba(255,248,240,0.95) 0%, rgba(255,248,240,0.85) 45%, rgba(255,248,240,0.3) 100%), url('/images/Decor.jpeg') center/cover no-repeat",
+            padding: "calc(var(--navbar-height, 72px) + 1rem) 0 2.25rem",
+            overflow: "hidden",
+          }}
+        >
+          <div className="container" style={{ maxWidth: "1140px", margin: "0 auto", padding: "0 1.25rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "2rem",
+                alignItems: "center",
+              }}
+              className="hero-grid-responsive"
+            >
+              {/* Left Column: Text Content & Dual CTA Buttons */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <div style={{ fontSize: "1 rem", fontWeight: 700, letterSpacing: "0.12em", color: "var(--primary)", textTransform: "uppercase" }}>
+                  ELITE TAMIL MATRIMONY
+                </div>
+
+                <h1
+                  style={{
+                    fontSize: "clamp(2.25rem, 4.5vw, 3.5rem)",
+                    fontWeight: 800,
+                    color: "var(--text-dark)",
+                    lineHeight: 1.15,
+                    letterSpacing: "-0.02em",
+                    margin: 0,
+                  }}
+                >
+                  Tradition Meets <br />
+                  <span style={{ color: "var(--primary)" }}>True Connections</span>
                 </h1>
-                
-                {/* Illustration — hidden on mobile */}
-                <div className="hide-mobile" style={{ display: "flex", justifyContent: "center", width: "100%" }}>
-                  <img
-                    src="/wedding-couple.png"
-                    alt="Tamil wedding couple illustration"
-                    className="animate-fade-in hero-image"
+
+                <p
+                  style={{
+                    fontSize: "1.0625rem",
+                    color: "var(--text-medium)",
+                    lineHeight: 1.6,
+                    maxWidth: "480px",
+                    margin: 0,
+                  }}
+                >
+                  Find your life partner from a trusted community where values, culture and love come together.
+                </p>
+
+                <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+                  <Link
+                    href="/register"
                     style={{
-                      maxWidth: "320px",
-                      width: "100%",
-                      borderRadius: "16px",
-                      filter: "drop-shadow(0 8px 32px rgba(107,26,42,0.15))",
+                      background: "var(--primary)",
+                      color: "#fff",
+                      borderRadius: "var(--radius-full)",
+                      padding: "0.8125rem 2rem",
+                      fontSize: "0.9375rem",
+                      fontWeight: 700,
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      boxShadow: "var(--shadow-md)",
+                      transition: "all 0.2s ease",
                     }}
-                  />
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--primary-dark)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "var(--primary)")}
+                  >
+                    Create Your Profile
+                    <ArrowRight size={18} />
+                  </Link>
+
+                  <Link
+                    href="/matches"
+                    style={{
+                      border: "1.5px solid var(--secondary)",
+                      color: "var(--text-dark)",
+                      background: "#fff",
+                      borderRadius: "var(--radius-full)",
+                      padding: "0.8125rem 1.75rem",
+                      fontSize: "0.9375rem",
+                      fontWeight: 700,
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      transition: "all 0.2s ease",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--secondary-light)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
+                  >
+                    Browse Matches
+                  </Link>
                 </div>
               </div>
 
-              {/* Right Column: Register form */}
-              <div className="hero-right">
-                <div className="hero-form-wrap" style={{ display: "flex", justifyContent: "center" }}>
-                  <HeroAuthCard />
-                </div>
+              {/* Right Column / Corner: Hero Visual with Clean Wedding Image */}
+              <div
+                style={{
+                  width: "100%",
+                  borderRadius: "28px",
+                  overflow: "hidden",
+                  boxShadow: "0 12px 36px rgba(107,26,42,0.15)",
+                  border: "1.5px solid rgba(255,255,255,0.8)",
+                  maxHeight: "440px",
+                  background: "#fff",
+                }}
+              >
+                <img
+                  src="/images/Romantic Wedding Couple.jpeg"
+                  alt="Elite Tamil Matrimony Sangeet Wedding Couple"
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    maxHeight: "440px",
+                    objectFit: "cover",
+                    objectPosition: "top center",
+                    display: "block",
+                  }}
+                />
               </div>
             </div>
 
             <style>{`
-              .hero-inner {
-                display: flex;
-                flex-direction: column;
-                gap: 1.5rem;
-              }
-              .hero-text {
-                text-align: center;
-              }
-              .hero-right {
-                width: 100%;
-                min-width: 0;
-                overflow: hidden;
-              }
-              .hero-form-wrap {
-                display: flex;
-                justify-content: center;
-                width: 100%;
-                min-width: 0;
-              }
-              .hero-form-wrap > * {
-                width: 100%;
-                max-width: 380px;
-                box-sizing: border-box;
-                min-width: 0;
-              }
               @media (min-width: 992px) {
-                .hero-inner {
-                  flex-direction: row;
-                  align-items: center;
-                  justify-content: space-between;
-                }
-                .hero-left {
-                  flex: 1;
-                  padding-right: 2rem;
-                }
-                .hero-right {
-                  flex: 1;
-                }
-                .hero-text {
-                  text-align: left;
-                }
-                .hero-form-wrap {
-                  justify-content: flex-end;
-                }
-                .hero-image {
-                  margin-left: 0;
-                  margin-right: auto;
+                .hero-grid-responsive {
+                  grid-template-columns: 1.1fr 1fr !important;
                 }
               }
             `}</style>
           </div>
         </section>
 
-        {/* =================== STATS BAR =================== */}
-        <section style={{ background: "#fff", borderTop: "1px solid var(--border-light)", borderBottom: "1px solid var(--border-light)", padding: "1.25rem 0" }}>
-          <div className="container">
-            <div style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-              gap: "1rem",
-              alignItems: "center",
-            }}>
-              {STATS.map((stat) => (
-                <div key={stat.label} style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <div className="stat-icon-wrap" style={{ flexShrink: 0 }}>{stat.icon}</div>
-                  <div>
-                    <div style={{ fontSize: "1.125rem", fontWeight: 900, color: "var(--text-dark)", lineHeight: 1.1 }}>
-                      {stat.value}
+        {/* =================== SUB-HERO TRUST BAR =================== */}
+        <section
+          style={{
+            background: "#fff",
+            borderTop: "1px solid var(--border-light)",
+            borderBottom: "1px solid var(--border-light)",
+            padding: "1.75rem 0",
+          }}
+        >
+          <div className="container" style={{ maxWidth: "1140px", margin: "0 auto", padding: "0 1.25rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                gap: "1.5rem",
+                alignItems: "center",
+              }}
+            >
+              {[
+                {
+                  icon: (
+                    <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--primary-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)", flexShrink: 0 }}>
+                      <Users size={22} />
                     </div>
-                    <div style={{ fontSize: "0.75rem", color: "var(--text-light)", marginTop: "2px" }}>
-                      {stat.label}
+                  ),
+                  title: "Verified Profiles",
+                  desc: "Safe & Genuine",
+                },
+                {
+                  icon: (
+                    <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--primary-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)", flexShrink: 0 }}>
+                      <Shield size={22} />
+                    </div>
+                  ),
+                  title: "Trusted Community",
+                  desc: "For a Better Tomorrow",
+                },
+                {
+                  icon: (
+                    <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--primary-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)", flexShrink: 0 }}>
+                      <Heart size={22} />
+                    </div>
+                  ),
+                  title: "Smart Matching",
+                  desc: "Find Your Compatibility",
+                },
+                {
+                  icon: (
+                    <div style={{ width: "48px", height: "48px", borderRadius: "50%", background: "var(--primary-light)", display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)", flexShrink: 0 }}>
+                      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+                        <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+                      </svg>
+                    </div>
+                  ),
+                  title: "Dedicated Support",
+                  desc: "Always With You",
+                },
+              ].map((feat) => (
+                <div key={feat.title} style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+                  {feat.icon}
+                  <div>
+                    <div style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text-dark)", lineHeight: 1.2 }}>
+                      {feat.title}
+                    </div>
+                    <div style={{ fontSize: "0.8125rem", color: "var(--text-muted)", marginTop: "2px" }}>
+                      {feat.desc}
                     </div>
                   </div>
                 </div>
@@ -1573,144 +2443,185 @@ export default function HomePage() {
             </div>
           </div>
         </section>
+
+        {/* =================== QUICK REGISTER & LOGIN CARD SECTION (DISABLED / COMMENTED OUT AS REQUESTED) =================== */}
+        {/*
+        <section style={{ background: "#fff", padding: "2.5rem 0 1.5rem" }} id="register-card">
+          <div className="container" style={{ maxWidth: "1140px", margin: "0 auto", padding: "0 1.25rem", display: "flex", justifyContent: "center" }}>
+            <HeroAuthCard />
+          </div>
+        </section>
+        */}
+
+        {/* =================== "BECAUSE EVERY LOVE STORY MATTERS" SECTION =================== */}
+        <section style={{ background: "var(--bg-page)", padding: "4rem 0" }}>
+          <div className="container" style={{ maxWidth: "1140px", margin: "0 auto", padding: "0 1.25rem" }}>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "1fr",
+                gap: "2.5rem",
+                alignItems: "center",
+              }}
+              className="love-story-grid"
+            >
+              {/* Left Column: Heading & Description */}
+              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
+                <h2
+                  style={{
+                    fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
+                    fontWeight: 800,
+                    color: "var(--text-dark)",
+                    lineHeight: 1.2,
+                    margin: 0,
+                  }}
+                >
+                  Because Every <br />
+                  <span style={{ color: "var(--primary)" }}>Love Story Matters</span>
+                </h2>
+
+                <p
+                  style={{
+                    fontSize: "0.9375rem",
+                    color: "var(--text-medium)",
+                    lineHeight: 1.65,
+                    margin: "0.25rem 0 1rem",
+                  }}
+                >
+                  Elite Tamil Matrimony brings together like-minded individuals from our community, helping you build a beautiful future, together.
+                </p>
+
+                <div>
+                  <Link
+                    href="/register"
+                    style={{
+                      background: "var(--primary)",
+                      color: "#fff",
+                      borderRadius: "var(--radius-full)",
+                      padding: "0.75rem 2rem",
+                      fontSize: "0.875rem",
+                      fontWeight: 700,
+                      textDecoration: "none",
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: "0.5rem",
+                      boxShadow: "var(--shadow-sm)",
+                      transition: "all 0.15s ease",
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--primary-dark)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "var(--primary)")}
+                  >
+                    Start Your Search
+                    <ArrowRight size={16} />
+                  </Link>
+                </div>
+              </div>
+
+              {/* Right Column: 3 Feature Cards Side-by-Side */}
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+                  gap: "1rem",
+                }}
+              >
+                {[
+                  {
+                    img: "/images/Traditional Wedding.jpeg",
+                    title: "Real People",
+                    sub: "Real Stories",
+                  },
+                  {
+                    img: "/images/Table decor Flower.jpeg",
+                    title: "Beautiful",
+                    sub: "Beginnings",
+                  },
+                  {
+                    img: "/images/Reception.jpeg",
+                    title: "Lasting",
+                    sub: "Relationships",
+                  },
+                ].map((item) => (
+                  <div
+                    key={item.title}
+                    style={{
+                      background: "#fff",
+                      borderRadius: "20px",
+                      overflow: "hidden",
+                      boxShadow: "var(--shadow-sm)",
+                      border: "1px solid var(--border-light)",
+                      textAlign: "center",
+                    }}
+                  >
+                    <div style={{ height: "140px", overflow: "hidden" }}>
+                      <img
+                        src={item.img}
+                        alt={item.title}
+                        style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }}
+                      />
+                    </div>
+                    <div style={{ padding: "0.875rem 0.5rem" }}>
+                      <div style={{ fontWeight: 700, fontSize: "0.875rem", color: "var(--text-dark)" }}>{item.title}</div>
+                      <div style={{ fontSize: "0.8125rem", color: "var(--text-medium)" }}>{item.sub}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <style>{`
+              @media (min-width: 992px) {
+                .love-story-grid {
+                  grid-template-columns: 1fr 1.3fr !important;
+                }
+              }
+            `}</style>
+          </div>
+        </section>
+
+        {/* =================== DYNAMIC SUCCESS STORIES SECTION =================== */}
+        <GuestSuccessStories />
 
         {/* =================== LATEST PROFILES =================== */}
         <GuestLatestProfiles />
 
-        {/* =================== HOW IT WORKS =================== */}
-        <section style={{ background: "var(--bg-page)", padding: "3rem 0" }}>
-          <div className="container">
-            <div style={{ textAlign: "center", marginBottom: "2rem" }}>
-              <h2 style={{ fontSize: "1.375rem", fontWeight: 900, color: "var(--text-dark)", marginBottom: "0.375rem" }}>
-                How It Works
-              </h2>
-              <p style={{ fontSize: "0.9375rem", color: "var(--text-medium)" }}>
-                Find your Tamil match in 3 simple steps
-              </p>
-            </div>
-
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1.5rem" }}>
-              {[
-                {
-                  step: "1",
-                  title: "Register Free",
-                  desc: "Create your profile in under 5 minutes. Basic details, preferences, and a photo.",
-                  icon: (
-                    <svg width="36" height="36" viewBox="0 0 48 48" fill="none" stroke="var(--bm-green)" strokeWidth="1.8">
-                      <rect x="8" y="6" width="32" height="38" rx="4" />
-                      <line x1="16" y1="18" x2="32" y2="18" />
-                      <line x1="16" y1="25" x2="32" y2="25" />
-                      <line x1="16" y1="32" x2="24" y2="32" />
-                      <circle cx="34" cy="36" r="6" fill="var(--bm-green)" stroke="none" />
-                      <path d="M31 36l2 2 4-3" stroke="white" strokeWidth="1.5" />
-                    </svg>
-                  ),
-                },
-                {
-                  step: "2",
-                  title: "Search & Match",
-                  desc: "Browse verified Tamil profiles. Use smart filters to find your ideal match.",
-                  icon: (
-                    <svg width="36" height="36" viewBox="0 0 48 48" fill="none" stroke="var(--bm-green)" strokeWidth="1.8">
-                      <circle cx="20" cy="20" r="12" />
-                      <line x1="29" y1="29" x2="40" y2="40" />
-                      <line x1="14" y1="20" x2="26" y2="20" />
-                      <line x1="20" y1="14" x2="20" y2="26" />
-                    </svg>
-                  ),
-                },
-                {
-                  step: "3",
-                  title: "Connect & Meet",
-                  desc: "Send interest, chat after matching, and take the next step toward a lifelong bond.",
-                  icon: (
-                    <svg width="36" height="36" viewBox="0 0 48 48" fill="none" stroke="var(--bm-green)" strokeWidth="1.8">
-                      <path d="M12 20c0-8 4-14 12-14s12 6 12 14c0 6-4 12-12 16C16 32 12 26 12 20z" />
-                      <circle cx="24" cy="20" r="4" fill="var(--bm-green)" stroke="none" />
-                    </svg>
-                  ),
-                },
-              ].map((step) => (
-                <div
-                  key={step.step}
-                  style={{
-                    background: "#fff",
-                    border: "1px solid var(--border-light)",
-                    borderRadius: "var(--radius-xl)",
-                    padding: "1.5rem",
-                    textAlign: "center",
-                  }}
-                >
-                  <div style={{ display: "flex", justifyContent: "center", marginBottom: "0.875rem" }}>
-                    {step.icon}
-                  </div>
-                  <div
-                    style={{
-                      display: "inline-block",
-                      width: "24px",
-                      height: "24px",
-                      borderRadius: "50%",
-                      background: "var(--primary)",
-                      color: "#fff",
-                      fontSize: "0.75rem",
-                      fontWeight: 700,
-                      lineHeight: "24px",
-                      textAlign: "center",
-                      marginBottom: "0.5rem",
-                    }}
-                  >
-                    {step.step}
-                  </div>
-                  <div style={{ fontWeight: 700, fontSize: "0.9375rem", color: "var(--text-dark)", marginBottom: "0.375rem" }}>
-                    {step.title}
-                  </div>
-                  <div style={{ fontSize: "0.8125rem", color: "var(--text-medium)", lineHeight: 1.55 }}>
-                    {step.desc}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </section>
-
-        {/* =================== SUCCESS STORIES (DB-backed) =================== */}
-        <GuestSuccessStories />
-
-        {/* =================== MEMBERSHIP CTA =================== */}
+        {/* =================== BOTTOM CTA BANNER =================== */}
         <section
           style={{
-            background: "var(--gradient-hero)",
-            padding: "2.5rem 0",
+            position: "relative",
+            background: "linear-gradient(90deg, rgba(74,15,28,0.85) 0%, rgba(107,26,42,0.65) 100%), url('/images/Rose.jpeg') center/cover no-repeat",
+            padding: "4rem 0",
+            color: "#fff",
           }}
         >
-          <div className="container">
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1.5rem" }}>
-              <div style={{ color: "#fff" }}>
-                <div style={{ fontSize: "1.25rem", fontWeight: 900, marginBottom: "0.25rem" }}>
-                  Ready to find your perfect Tamil match?
-                </div>
-                <div style={{ fontSize: "0.9375rem", opacity: 0.85 }}>
-                  Register free today and start your journey.
-                </div>
-              </div>
+          <div className="container" style={{ maxWidth: "1140px", margin: "0 auto", padding: "0 1.25rem", position: "relative", zIndex: 2 }}>
+            <div style={{ maxWidth: "540px" }}>
+              <h2 style={{ fontSize: "clamp(1.75rem, 4vw, 2.5rem)", fontWeight: 800, margin: "0 0 0.75rem", lineHeight: 1.2 }}>
+                Your Perfect Match <br />
+                Could Be Just a Click Away
+              </h2>
+              <p style={{ fontSize: "0.9375rem", opacity: 0.9, margin: "0 0 1.75rem", lineHeight: 1.6 }}>
+                Join thousands of happy couples and take the first step towards your forever.
+              </p>
               <Link
                 href="/register"
-                className="btn"
                 style={{
-                  background: "#fff",
-                  color: "var(--primary)",
-                  padding: "0.75rem 2rem",
+                  background: "var(--primary)",
+                  color: "#fff",
+                  borderRadius: "var(--radius-full)",
+                  padding: "0.875rem 2.25rem",
                   fontSize: "0.9375rem",
                   fontWeight: 700,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.04em",
+                  textDecoration: "none",
                   display: "inline-flex",
                   alignItems: "center",
-                  gap: "6px",
+                  gap: "0.5rem",
+                  boxShadow: "var(--shadow-md)",
+                  border: "1px solid rgba(255,255,255,0.2)",
                 }}
               >
-                Register Free
-                <ArrowRight size={16} />
+                Start Your Profile
+                <ArrowRight size={18} />
               </Link>
             </div>
           </div>
@@ -1721,3 +2632,5 @@ export default function HomePage() {
     </>
   );
 }
+
+

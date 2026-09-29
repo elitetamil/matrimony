@@ -44,7 +44,11 @@ export default function ForgotPasswordPage() {
       <Navbar />
       <main
         style={{
-          background: "var(--bg-page)",
+          backgroundImage: "linear-gradient(rgba(250, 246, 241, 0.82), rgba(250, 246, 241, 0.82)), url('/images/Bg.jpeg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed",
           minHeight: "calc(100vh - 120px)",
           display: "flex",
           alignItems: "center",

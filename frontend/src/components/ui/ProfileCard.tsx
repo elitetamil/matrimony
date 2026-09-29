@@ -38,6 +38,7 @@ export interface ProfileData {
 interface ProfileCardProps {
   profile: ProfileData;
   variant?: "full" | "compact";
+  from?: string;
 }
 
 // SVG Avatar — WhatsApp style generic avatar
@@ -56,14 +57,14 @@ function GenderAvatar({ gender, width = 64, height = 72, blur = false }: { gende
       overflow: "hidden"
     }}>
       <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" style={{ marginBottom: isLarge ? 0 : "-4px" }}>
-        <circle cx="12" cy="8" r="5" fill="#FFFFFF" />
+        <circle cx="12" r="5" cy="8" fill="#FFFFFF" />
         <path d="M4 22c0-4.5 3.5-8 8-8s8 3.5 8 8" fill="#FFFFFF" />
       </svg>
     </div>
   );
 }
 
-export default function ProfileCard({ profile, variant = "full" }: ProfileCardProps) {
+export default function ProfileCard({ profile, variant = "full", from }: ProfileCardProps) {
   const { user } = useAuth();
   const router = useRouter();
   const [interested, setInterested] = useState(false);
@@ -147,7 +148,7 @@ export default function ProfileCard({ profile, variant = "full" }: ProfileCardPr
           overflow: "hidden",
         }}
       >
-        <Link href={isLoggedIn ? `/profile/${profile.id}` : "/login"} style={{ flexShrink: 0, textDecoration: "none" }}>
+        <Link href={isLoggedIn ? (from ? `/profile/${profile.id}?from=${from}` : `/profile/${profile.id}`) : "/login"} style={{ flexShrink: 0, textDecoration: "none" }}>
           <div style={{ position: "relative" }}>
             {photo
               ? <img src={photo} alt={profile.name} style={{ width: "64px", height: "72px", objectFit: "cover", objectPosition: "top center", background: "#F8F0F0", borderRadius: "var(--radius-md)", display: "block", filter: isLoggedIn ? "none" : "blur(6px)" }} />
@@ -157,7 +158,7 @@ export default function ProfileCard({ profile, variant = "full" }: ProfileCardPr
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
             <Link
-              href={isLoggedIn ? `/profile/${profile.id}` : "/login"}
+              href={isLoggedIn ? (from ? `/profile/${profile.id}?from=${from}` : `/profile/${profile.id}`) : "/login"}
               style={{ fontWeight: 700, fontSize: "0.9375rem", color: "var(--text-dark)", textDecoration: "none",
                 filter: isLoggedIn ? "none" : "blur(4px)", userSelect: isLoggedIn ? "auto" : "none" }}
             >
@@ -251,7 +252,7 @@ export default function ProfileCard({ profile, variant = "full" }: ProfileCardPr
     >
       {/* Photo area */}
       <div style={{ position: "relative", height: "240px", overflow: "hidden", background: "#F8F0F0" }}>
-        <Link href={isLoggedIn ? `/profile/${profile.id}` : "/login"}>
+        <Link href={isLoggedIn ? (from ? `/profile/${profile.id}?from=${from}` : `/profile/${profile.id}`) : "/login"}>
           {photo
             ? <img
                 src={photo}
@@ -340,7 +341,7 @@ export default function ProfileCard({ profile, variant = "full" }: ProfileCardPr
         {/* Name + Verified */}
         <div style={{ display: "flex", alignItems: "center", gap: "0.375rem", marginBottom: "2px" }}>
           <Link
-            href={isLoggedIn ? `/profile/${profile.id}` : "/login"}
+            href={isLoggedIn ? (from ? `/profile/${profile.id}?from=${from}` : `/profile/${profile.id}`) : "/login"}
             style={{
               fontWeight: 700, fontSize: "1rem", color: "var(--text-dark)", textDecoration: "none",
               filter: isLoggedIn ? "none" : "blur(5px)",

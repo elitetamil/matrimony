@@ -8,6 +8,7 @@ import { registerUser, saveCompatibilityAnswers } from "@/lib/auth-store";
 import { uploadProfilePhoto } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useMSG91, CAPTCHA_DIV_ID } from "@/hooks/useMSG91";
+import { validateEmail } from "@/lib/email-validator";
 import {
   RELIGIONS, RELIGION_TO_CASTES, CASTE_TO_SUBCASTE, MOTHER_TONGUES, HEIGHTS,
   EDUCATION_LEVELS, OCCUPATIONS, INCOME_RANGES, INDIAN_STATES,
@@ -65,13 +66,6 @@ function FieldError({ msg }: { msg?: string }) {
 }
 
 // ── Validation helpers ────────────────────────────────────────────────────
-function validateEmail(v: string): string {
-  if (!v.trim()) return "";
-  const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  if (!emailRe.test(v)) return "Email is invalid.";
-  return "";
-}
-
 function validatePassword(v: string): string {
   if (!v) return "";
   if (v.length < 6) return "Password must contain at least 6 characters.";
@@ -465,12 +459,12 @@ function MultiSelectTags({ label, values, onChange, options, placeholder = "Sele
 function StepProgressBar({ step, total }: { step: number; total: number }) {
   const pct = Math.round(((step) / total) * 100);
   return (
-    <div style={{ marginBottom: "1.25rem" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.375rem" }}>
+    <div style={{ marginBottom: "0.375rem" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.125rem" }}>
         <span style={{ fontSize: "0.75rem", fontWeight: 600, color: "var(--text-secondary)" }}>Step {step} of {total}</span>
         <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "var(--primary)" }}>{pct}% complete</span>
       </div>
-      <div style={{ height: "5px", background: "var(--border-light)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
+      <div style={{ height: "4px", background: "var(--border-light)", borderRadius: "var(--radius-full)", overflow: "hidden" }}>
         <div
           style={{
             height: "100%",
@@ -493,7 +487,7 @@ function StepProgressBar({ step, total }: { step: number; total: number }) {
 // ---- Step header ----
 function StepHeader({ step, total, title, onBack }: { step: number; total: number; title: string; onBack?: () => void }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
+    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "0.375rem" }}>
       <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
         {onBack && (
           <button onClick={onBack} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "var(--text-dark)", display: "flex" }}>
@@ -714,10 +708,14 @@ function RegisterWizard() {
   };
 
   const handleSendEmailOtp = async () => {
-    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!form.email.trim() || !emailRe.test(form.email)) {
-      setFieldError("email", "Please enter a valid email address."); return;
+    const emailValidation = validateEmail(form.email);
+    if (!emailValidation.valid) {
+      const msg = emailValidation.error || "Please enter a valid Gmail address.";
+      setFieldError("email", msg);
+      toast.error(msg);
+      return;
     }
+    setFieldError("email", "");
     setEmailOtpSending(true);
     try {
       const res = await fetch("/api/send-email-otp", {
@@ -777,9 +775,12 @@ function RegisterWizard() {
     if (!form.email.trim()) {
       newErrors.email = "Email address is required.";
     } else {
-      const emailErr = validateEmail(form.email);
-      if (emailErr) newErrors.email = emailErr;
-      else if (!emailOtpVerified) newErrors.email = "Please verify your email address before continuing.";
+      const emailValidation = validateEmail(form.email);
+      if (!emailValidation.valid) {
+        newErrors.email = emailValidation.error || "Please enter a valid Gmail address.";
+      } else if (!emailOtpVerified) {
+        newErrors.email = "Please verify your email address before continuing.";
+      }
     }
     // Password is mandatory
     if (!form.password) {
@@ -833,7 +834,10 @@ function RegisterWizard() {
     if (!form.dob)                    { toast.error("Please enter your date of birth"); return; }
     if (!form.gender)                 { toast.error("Please select your gender"); return; }
     if (!otpVerified)                 { toast.error("Please verify your mobile number first"); return; }
-    if (!form.email.trim())           { toast.error("Please enter your email address"); return; }
+    if (!form.email.trim() || !validateEmail(form.email).valid) {
+      toast.error("Please enter a valid Gmail address.");
+      return;
+    }
     if (!form.password)               { toast.error("Please set a password"); return; }
 
     setIsSubmitting(true);
@@ -910,13 +914,23 @@ function RegisterWizard() {
   // RENDER STEPS
   // =====================================
   return (
-    <div style={{ minHeight: "100vh", background: "var(--bg-page)" }}>
+    <div
+      style={{
+        marginTop: "calc(-1 * var(--navbar-height, 70px))",
+        minHeight: "100vh",
+        backgroundImage: "linear-gradient(rgba(250, 246, 241, 0.82), rgba(250, 246, 241, 0.82)), url('/images/Bg.jpeg')",
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+        backgroundRepeat: "no-repeat",
+        backgroundAttachment: "fixed",
+      }}
+    >
       {/* MSG91 hCaptcha container — must be a visible DOM element for exposeMethods:true.
           Without this, MSG91 routes through grecaptcha.enterprise which silently hangs
           on production domains when reCAPTCHA Enterprise is not configured. */}
       <div id={CAPTCHA_DIV_ID} style={{ position: "fixed", bottom: "1rem", right: "1rem", zIndex: 0 }} />
       {/* Minimal header */}
-      <header style={{ background: "#fff", borderBottom: "1px solid var(--border-color)", padding: "0.75rem 0" }}>
+      <header style={{ background: "#fff", borderBottom: "1px solid var(--border-color)", padding: "0.375rem 0" }}>
         <div className="container" style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
           <a href="/" style={{ display: "flex", alignItems: "center", gap: "8px", textDecoration: "none" }}>
             <img
@@ -1079,7 +1093,7 @@ function RegisterWizard() {
         </div>
       )}
 
-      <div style={{ maxWidth: "560px", margin: "0 auto", padding: "0.5rem 1.25rem 1.5rem", overflowX: "hidden" }}>
+      <div style={{ maxWidth: "560px", margin: "0 auto", padding: "0.25rem 1rem 1.5rem", overflowX: "hidden" }}>
 
         {/* ===== STEP 0: Basic Info ===== */}
         {step === 0 && (

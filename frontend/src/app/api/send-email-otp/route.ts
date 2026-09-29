@@ -1,10 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { generateOtp, storeOtp } from "@/lib/email/otp-store";
 import { otpEmailHtml, otpEmailText } from "@/lib/email/templates";
-
-const resend = new Resend(process.env.RESEND_API_KEY || 're_dummy_key_for_build');
-const FROM = process.env.RESEND_FROM_EMAIL ?? "Elite Tamil Matrimony <admin@elitetamilmatrimony.com>";
+import { sendEmail } from "@/lib/email/sender";
+import { validateEmail } from "@/lib/email-validator";
 
 export async function POST(req: NextRequest) {
   try {
@@ -15,21 +13,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Email is required." }, { status: 400 });
     }
 
-    const emailRe = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRe.test(email)) {
-      return NextResponse.json({ error: "Invalid email address." }, { status: 400 });
+    const emailValidation = validateEmail(email);
+    if (!emailValidation.valid) {
+      return NextResponse.json({ error: emailValidation.error || "Please enter a valid Gmail address." }, { status: 400 });
     }
 
-    // Don't allow synthetic etm.app addresses
-    if (email.toLowerCase().endsWith("@etm.app")) {
-      return NextResponse.json({ error: "Please enter a real email address." }, { status: 400 });
-    }
-
-    // In development mode, if API key is missing or dummy, fallback to 123456
-    const resendKey = process.env.RESEND_API_KEY;
-    const isMock = !resendKey || resendKey === 're_dummy_key_for_build';
+    // Always generate dynamic 6-digit random OTP
+    const otp = generateOtp();
     
-    const otp = isMock ? '123456' : generateOtp();
     // Store OTP in DB FIRST — if this fails, do not send the email
     try {
       await storeOtp(email, otp);
@@ -42,24 +33,18 @@ export async function POST(req: NextRequest) {
     }
 
     const displayName = name || "there";
-    
-    if (isMock) {
-      console.warn("[send-email-otp] Mock mode: No valid RESEND_API_KEY configured. OTP generated but not sent:", otp);
-      return NextResponse.json({ success: true });
-    }
 
-    const { error } = await resend.emails.send({
-      from: FROM,
-      to: [email],
+    const result = await sendEmail({
+      to: email,
       subject: "Verify your email — Elite Tamil Matrimony",
       html: otpEmailHtml(displayName, otp),
       text: otpEmailText(displayName, otp),
     });
 
-    if (error) {
-      console.error("[send-email-otp] Resend error:", error);
+    if (!result.success) {
+      console.error("[send-email-otp] Email delivery error:", result.error);
       return NextResponse.json(
-        { error: "Failed to send OTP email. Please try again." },
+        { error: result.error || "Failed to send OTP email. Please check email settings." },
         { status: 500 }
       );
     }
@@ -70,3 +55,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Server error." }, { status: 500 });
   }
 }
+

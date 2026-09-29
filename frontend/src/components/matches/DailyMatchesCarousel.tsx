@@ -328,7 +328,7 @@ export default function DailyMatchesCarousel() {
                   </button>
 
                   <Link
-                    href={`/profile/${activeProfile.id}?from=matches`}
+                    href={`/profile/${activeProfile.id}?from=daily_matches`}
                     style={{
                       display: "flex", alignItems: "center", gap: "0.5rem",
                       padding: "0.625rem 1.5rem", borderRadius: "30px",
@@ -422,7 +422,7 @@ export default function DailyMatchesCarousel() {
                 </div>
                 
                 <Link
-                  href={`/profile/${activeProfile.id}?from=matches`}
+                  href={`/profile/${activeProfile.id}?from=daily_matches`}
                   style={{
                     display: "flex",
                     alignItems: "center",

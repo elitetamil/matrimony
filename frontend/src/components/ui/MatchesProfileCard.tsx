@@ -92,7 +92,7 @@ function ProfileCard({
     >
       {/* LEFT — Photo column */}
       <div style={{ gridArea: "photo", width: "100%", position: "relative" }} className="match-card-photo-wrap">
-        <Link href={`/profile/${profile.id}`} style={{ display: "block", lineHeight: 0, height: "100%" }}>
+        <Link href={`/profile/${profile.id}?from=matches`} style={{ display: "block", lineHeight: 0, height: "100%" }}>
           {photo ? (
             <img
               src={photo}
@@ -264,7 +264,7 @@ function ProfileCard({
 
             {/* Name */}
             <Link
-              href={`/profile/${profile.id}`}
+              href={`/profile/${profile.id}?from=matches`}
               style={{
                 fontSize: "1.125rem",
                 fontWeight: 700,
@@ -483,7 +483,7 @@ function ProfileCard({
           {/* View Contact — Gold+ */}
           {canViewContact ? (
             <Link
-              href={`/profile/${profile.id}#section-Contact-Details`}
+              href={`/profile/${profile.id}?from=matches#section-Contact-Details`}
               style={{
                 display: "flex",
                 alignItems: "center",

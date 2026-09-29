@@ -68,7 +68,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={lato.variable}>
+    <html lang="en" className={lato.variable} data-scroll-behavior="smooth">
       <head>
         {/* Favicon — Elite Tamil Matrimony transparent logo */}
         <link rel="icon" type="image/png" href="/logo-transparent.png" />

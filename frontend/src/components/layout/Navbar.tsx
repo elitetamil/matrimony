@@ -138,7 +138,7 @@ export default function Navbar() {
   const handleSwitchAccount = async () => {
     if (!targetAccount) return;
     setSwitchConfirmOpen(false);
-    
+
     const toastId = toast.loading("Switching account...");
     try {
       const res = await fetch("/api/otp-login", {
@@ -820,6 +820,15 @@ export default function Navbar() {
   }
 
   // ── GUEST NAVBAR ──────────────────────────────────────────────────────────
+  const GUEST_LINKS = [
+    { label: "Home", href: "/" },
+    { label: "About Us", href: "/about" },
+    { label: "Matches", href: "/matches" },
+    { label: "Success Stories", href: "/success-stories" },
+    { label: "Features", href: "/#how-it-works" },
+    { label: "Contact", href: "/contact" },
+  ];
+
   return (
     <header
       style={{
@@ -829,8 +838,8 @@ export default function Navbar() {
         right: 0,
         zIndex: 1000,
         background: scrolled ? "rgba(255,255,255,0.98)" : "#fff",
-        borderBottom: "1px solid #e0e0e0",
-        boxShadow: scrolled ? "0 3px 16px rgba(107,26,42,0.12)" : "0 1px 4px rgba(0,0,0,0.07)",
+        borderBottom: "1px solid var(--border-light)",
+        boxShadow: scrolled ? "0 3px 16px rgba(107,26,42,0.10)" : "0 1px 4px rgba(0,0,0,0.05)",
         backdropFilter: scrolled ? "blur(10px)" : "none",
         paddingLeft: "env(safe-area-inset-left, 0px)",
         paddingRight: "env(safe-area-inset-right, 0px)",
@@ -841,109 +850,138 @@ export default function Navbar() {
         style={{
           maxWidth: "1140px",
           margin: "0 auto",
-          padding: "0 1rem",
+          padding: "0 1.25rem",
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: "0.5rem",
-          height: scrolled ? "56px" : "64px",
+          gap: "1rem",
+          height: scrolled ? "60px" : "72px",
           transition: "height 0.2s ease",
         }}
       >
         {/* Logo */}
-        <Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "8px", flexShrink: 0 }}>
+        <Link href="/" style={{ textDecoration: "none", display: "flex", alignItems: "center", gap: "12px", flexShrink: 0 }}>
           <img
             src="/logo-transparent.png"
             alt="Elite Tamil Matrimony"
-            style={{ height: "38px", width: "auto", display: "block" }}
+            style={{ height: "52px", width: "auto", display: "block" }}
           />
           <div style={{ display: "flex", flexDirection: "column", lineHeight: 1.15 }}>
-            <span style={{ fontFamily: "'Lato', sans-serif", fontWeight: 700, fontSize: "0.875rem", color: "#6B1A2A", letterSpacing: "0.04em", textTransform: "uppercase" }}>Elite</span>
-            <span style={{ fontFamily: "'Lato', sans-serif", fontWeight: 700, fontSize: "0.625rem", color: "#C8973A", letterSpacing: "0.08em", textTransform: "uppercase" }}>Tamil Matrimony</span>
+            <span style={{ fontFamily: "var(--font-sans)", fontWeight: 800, fontSize: "1.15rem", color: "var(--primary)", letterSpacing: "0.05em", textTransform: "uppercase" }}>Elite</span>
+            <span style={{ fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "0.75rem", color: "var(--secondary)", letterSpacing: "0.09em", textTransform: "uppercase" }}>Tamil Matrimony</span>
           </div>
         </Link>
 
-        {/* Right side: always-visible auth buttons + hamburger for extra links */}
-        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", flexShrink: 0 }}>
-          {/* "Already a member?" — hidden on very small screens */}
-          <span className="guest-already-text" style={{ fontSize: "0.8125rem", color: "#777", whiteSpace: "nowrap" }}>
-            Already a member?
-          </span>
+        {/* Center Nav Links (Desktop) */}
+        <nav className="hide-mobile" style={{ display: "flex", alignItems: "center", gap: "1.75rem" }}>
+          {GUEST_LINKS.map((link) => {
+            const active = link.href === "/" ? pathname === "/" : pathname.startsWith(link.href);
+            return (
+              <Link
+                key={link.label}
+                href={link.href}
+                style={{
+                  textDecoration: "none",
+                  fontSize: "0.875rem",
+                  fontWeight: active ? 700 : 500,
+                  color: active ? "var(--primary)" : "var(--text-medium)",
+                  position: "relative",
+                  padding: "0.5rem 0.25rem",
+                  margin: "0 0.25rem",
+                  whiteSpace: "nowrap",
+                  display: "inline-block",
+                  transition: "color 0.15s ease",
+                }}
+              >
+                {link.label}
+                {active && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      bottom: "-2px",
+                      left: 0,
+                      right: 0,
+                      height: "2.5px",
+                      backgroundColor: "var(--primary)",
+                      borderRadius: "2px",
+                    }}
+                  />
+                )}
+              </Link>
+            );
+          })}
+        </nav>
 
-          {/* Login — ALWAYS visible */}
+        {/* Right side: Pill buttons for Login & Sign Up */}
+        <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexShrink: 0 }}>
+          {/* Login — Pill outline button */}
           <Link
             href="/login"
-            className="nav-btn-mobile-xs"
             style={{
               border: "1.5px solid var(--primary)",
               color: "var(--primary)",
-              padding: "0.375rem 0.75rem",
-              borderRadius: "4px",
+              padding: "0.4375rem 1.25rem",
+              borderRadius: "var(--radius-full)",
               fontWeight: 700,
               fontSize: "0.8125rem",
               textDecoration: "none",
-              textTransform: "uppercase",
-              letterSpacing: "0.03em",
+              letterSpacing: "0.02em",
               whiteSpace: "nowrap",
-              transition: "background 0.15s, color 0.15s",
+              transition: "all 0.15s ease",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--primary)"; e.currentTarget.style.color = "#fff"; }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = "var(--primary)"; }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = "var(--primary-light)"; }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
           >
             Login
           </Link>
 
-          {/* Register Free — ALWAYS visible */}
+          {/* Sign Up — Pill solid button */}
           <Link
             href="/register"
-            className="nav-btn-mobile-xs"
             style={{
               background: "var(--primary)",
               color: "#fff",
-              padding: "0.375rem 0.75rem",
-              borderRadius: "4px",
+              padding: "0.4375rem 1.25rem",
+              borderRadius: "var(--radius-full)",
               fontWeight: 700,
               fontSize: "0.8125rem",
               textDecoration: "none",
-              textTransform: "uppercase",
-              letterSpacing: "0.03em",
+              letterSpacing: "0.02em",
               whiteSpace: "nowrap",
-              transition: "background 0.15s",
+              boxShadow: "var(--shadow-sm)",
+              transition: "all 0.15s ease",
             }}
             onMouseEnter={(e) => (e.currentTarget.style.background = "var(--primary-dark)")}
             onMouseLeave={(e) => (e.currentTarget.style.background = "var(--primary)")}
           >
-            Register <span className="hide-text-mobile-xs">Free</span>
+            Sign Up
           </Link>
 
-          {/* Hamburger for extra links */}
+          {/* Hamburger for mobile drawer */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
             aria-label={mobileOpen ? "Close menu" : "Open menu"}
             aria-expanded={mobileOpen}
+            className="show-mobile-flex"
             style={{
               background: "none",
               border: "none",
               cursor: "pointer",
               padding: "6px",
-              color: "#555",
-              display: "flex",
+              color: "var(--text-dark)",
               alignItems: "center",
               justifyContent: "center",
               minWidth: "36px",
               minHeight: "36px",
-              borderRadius: "4px",
-              transition: "background 0.15s",
+              borderRadius: "var(--radius-md)",
             }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "#f5f5f5")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "none")}
           >
-            {mobileOpen ? <X size={20} /> : <Menu size={20} />}
+            {mobileOpen ? <X size={22} /> : <Menu size={22} />}
           </button>
         </div>
       </div>
 
-      {/* Slide-in drawer for extra links */}
+      {/* Mobile Drawer */}
       {mobileOpen && (
         <>
           <div
@@ -961,44 +999,66 @@ export default function Navbar() {
               position: "fixed",
               top: 0,
               right: 0,
-              width: "260px",
+              width: "280px",
               height: "100vh",
               background: "#fff",
               zIndex: 995,
               boxShadow: "-4px 0 20px rgba(0,0,0,0.15)",
-              padding: "1rem",
+              padding: "1.25rem",
               animation: "slideInRight 0.25s ease",
               overflowY: "auto",
             }}
           >
-            {/* Drawer header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1.5rem" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
                 <img src="/logo-transparent.png" alt="Elite Tamil Matrimony" style={{ height: "34px", width: "auto" }} />
                 <div>
-                  <div style={{ fontFamily: "'Lato', sans-serif", fontWeight: 700, fontSize: "0.875rem", color: "#6B1A2A", textTransform: "uppercase", letterSpacing: "0.04em" }}>Elite</div>
-                  <div style={{ fontFamily: "'Lato', sans-serif", fontWeight: 700, fontSize: "0.625rem", color: "#C8973A", textTransform: "uppercase", letterSpacing: "0.08em" }}>Tamil Matrimony</div>
+                  <div style={{ fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "0.875rem", color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>Elite</div>
+                  <div style={{ fontFamily: "var(--font-sans)", fontWeight: 700, fontSize: "0.625rem", color: "var(--secondary)", textTransform: "uppercase", letterSpacing: "0.08em" }}>Tamil Matrimony</div>
                 </div>
               </div>
               <button
                 onClick={() => setMobileOpen(false)}
-                style={{ background: "none", border: "none", cursor: "pointer", padding: "6px", color: "#333", borderRadius: "4px" }}
+                style={{ background: "none", border: "none", cursor: "pointer", padding: "6px", color: "var(--text-dark)" }}
                 aria-label="Close menu"
               >
                 <X size={20} />
               </button>
             </div>
 
-            {/* CTA buttons in drawer */}
-            <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1.25rem" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem", marginBottom: "1.5rem" }}>
+              {GUEST_LINKS.map((link) => (
+                <Link
+                  key={link.label}
+                  href={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  style={{
+                    padding: "0.625rem 0",
+                    color: "var(--text-dark)",
+                    fontSize: "0.9375rem",
+                    fontWeight: 600,
+                    textDecoration: "none",
+                    borderBottom: "1px solid var(--border-light)",
+                  }}
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </div>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: "0.75rem" }}>
               <Link
                 href="/login"
                 onClick={() => setMobileOpen(false)}
                 style={{
-                  flex: 1, padding: "0.625rem 0.5rem",
-                  border: "1.5px solid var(--primary)", color: "var(--primary)",
-                  borderRadius: "4px", fontSize: "0.875rem", fontWeight: 700,
-                  textDecoration: "none", textAlign: "center", display: "block",
+                  padding: "0.625rem",
+                  border: "1.5px solid var(--primary)",
+                  color: "var(--primary)",
+                  borderRadius: "var(--radius-full)",
+                  fontSize: "0.875rem",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  textAlign: "center",
                 }}
               >
                 Login
@@ -1007,41 +1067,18 @@ export default function Navbar() {
                 href="/register"
                 onClick={() => setMobileOpen(false)}
                 style={{
-                  flex: 1, padding: "0.625rem 0.5rem",
-                  background: "var(--primary)", color: "#fff",
-                  borderRadius: "4px", fontSize: "0.875rem", fontWeight: 700,
-                  textDecoration: "none", textAlign: "center", display: "block",
+                  padding: "0.625rem",
+                  background: "var(--primary)",
+                  color: "#fff",
+                  borderRadius: "var(--radius-full)",
+                  fontSize: "0.875rem",
+                  fontWeight: 700,
+                  textDecoration: "none",
+                  textAlign: "center",
                 }}
               >
-                Register Free
+                Sign Up
               </Link>
-            </div>
-
-            {/* Extra nav links */}
-            <div style={{ borderTop: "1px solid #f0f0f0", paddingTop: "1rem", display: "flex", flexDirection: "column" }}>
-              {[
-                { href: "/faq", label: "Help & FAQ" },
-                { href: "/success-stories", label: "Success Stories" },
-                { href: "/membership", label: "Membership Plans" },
-                { href: "/contact", label: "Contact Us" },
-              ].map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  onClick={() => setMobileOpen(false)}
-                  style={{
-                    padding: "0.75rem 0",
-                    color: "#555",
-                    fontSize: "0.9375rem",
-                    textDecoration: "none",
-                    display: "block",
-                    borderBottom: "1px solid #f5f5f5",
-                    fontWeight: 500,
-                  }}
-                >
-                  {item.label}
-                </Link>
-              ))}
             </div>
           </div>
         </>
@@ -1056,10 +1093,15 @@ export default function Navbar() {
           from { opacity: 0; }
           to   { opacity: 1; }
         }
-        @media (max-width: 480px) {
-          .guest-already-text { display: none !important; }
+        @media (max-width: 899px) {
+          .hide-mobile { display: none !important; }
+          .show-mobile-flex { display: flex !important; }
+        }
+        @media (min-width: 900px) {
+          .show-mobile-flex { display: none !important; }
         }
       `}</style>
     </header>
   );
 }
+

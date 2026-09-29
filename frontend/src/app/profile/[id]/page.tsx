@@ -162,9 +162,19 @@ function InfoRow({
 // Shown when clicking "View My Profile" for a registered user whose ID
 // is not in mock data (ETM + timestamp IDs from registration)
 function OwnProfileFallback({ id }: { id: string }) {
+  const router = useRouter();
   const { user } = useAuth();
   const [storeUser, setStoreUser] = useState(user);
   const [loading, setLoading] = useState(!user);
+
+  const handleBack = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.replace("/matches");
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -189,9 +199,25 @@ function OwnProfileFallback({ id }: { id: string }) {
             <>
           {/* Header */}
           <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "1.5rem" }}>
-            <Link href="/matches" style={{ display: "flex", alignItems: "center", gap: "4px", color: "var(--primary)", fontWeight: 600, fontSize: "0.875rem", textDecoration: "none" }}>
+            <button
+              type="button"
+              onClick={handleBack}
+              style={{
+                background: "none",
+                border: "none",
+                padding: 0,
+                display: "flex",
+                alignItems: "center",
+                gap: "4px",
+                color: "var(--primary)",
+                fontWeight: 600,
+                fontSize: "0.875rem",
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
               <ArrowLeft size={14} /> Back
-            </Link>
+            </button>
             <span style={{ color: "#ccc" }}>›</span>
             <span style={{ fontSize: "0.875rem", color: "#888" }}>My Profile</span>
           </div>
@@ -361,8 +387,98 @@ function ProfileDetailPage({
   const router = useRouter();
   const searchParams = useSearchParams();
   const fromPage = searchParams?.get("from"); // e.g. "daily-recs"
-  const backHref = fromPage === "daily-recs" ? "/daily-recs" : "/matches";
-  const backLabel = fromPage === "daily-recs" ? "Back to Daily Recs" : "Back to Matches";
+  const [backLabel, setBackLabel] = useState<string>("Back");
+  const [fallbackHref, setFallbackHref] = useState<string>("/matches");
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    if (fromPage === "home") {
+      setBackLabel("Back to Home");
+      setFallbackHref("/");
+      return;
+    }
+    if (fromPage === "daily-recs" || fromPage === "daily_matches") {
+      setBackLabel("Back to Daily Matches");
+      setFallbackHref("/matches?section=daily_matches");
+      return;
+    }
+    if (fromPage === "shortlisted") {
+      setBackLabel("Back to Shortlisted");
+      setFallbackHref("/shortlisted");
+      return;
+    }
+    if (fromPage === "interests") {
+      setBackLabel("Back to Interests");
+      setFallbackHref("/interests");
+      return;
+    }
+    if (fromPage === "search") {
+      setBackLabel("Back to Search");
+      setFallbackHref("/search");
+      return;
+    }
+    if (fromPage === "matches") {
+      setBackLabel("Back to Matches");
+      setFallbackHref("/matches");
+      return;
+    }
+
+    if (document.referrer) {
+      try {
+        const refUrl = new URL(document.referrer);
+        if (refUrl.origin === window.location.origin) {
+          const path = refUrl.pathname;
+          if (path === "/" || path === "") {
+            setBackLabel("Back to Home");
+            setFallbackHref("/");
+          } else if (path.startsWith("/matches")) {
+            if (refUrl.searchParams.get("section") === "daily_matches") {
+              setBackLabel("Back to Daily Matches");
+            } else if (refUrl.searchParams.get("section") === "shortlisted") {
+              setBackLabel("Back to Shortlisted");
+            } else if (refUrl.searchParams.get("section") === "interests") {
+              setBackLabel("Back to Interests");
+            } else {
+              setBackLabel("Back to Matches");
+            }
+            setFallbackHref(path + refUrl.search);
+          } else if (path.startsWith("/daily-recs")) {
+            setBackLabel("Back to Daily Matches");
+            setFallbackHref("/matches?section=daily_matches");
+          } else if (path.startsWith("/shortlisted")) {
+            setBackLabel("Back to Shortlisted");
+            setFallbackHref("/shortlisted");
+          } else if (path.startsWith("/interests")) {
+            setBackLabel("Back to Interests");
+            setFallbackHref("/interests");
+          } else if (path.startsWith("/search")) {
+            setBackLabel("Back to Search");
+            setFallbackHref("/search");
+          } else if (path.startsWith("/messages")) {
+            setBackLabel("Back to Messages");
+            setFallbackHref("/messages");
+          } else {
+            setBackLabel("Back");
+            setFallbackHref(path + refUrl.search);
+          }
+          return;
+        }
+      } catch {}
+    }
+
+    setBackLabel("Back");
+    setFallbackHref("/matches");
+  }, [fromPage]);
+
+  const handleBack = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.replace(fallbackHref);
+    }
+  };
   const [loading, setLoading] = useState(true);
   const [dbProfile, setDbProfile] = useState<Awaited<ReturnType<typeof getUserById>> | null>(null);
 
@@ -589,9 +705,14 @@ function ProfileDetailPage({
             <p style={{ fontSize: "0.9375rem", color: "var(--text-medium)", marginBottom: "1.5rem", maxWidth: "360px", margin: "0 auto 1.5rem" }}>
               This profile doesn&apos;t exist or may have been removed.
             </p>
-            <Link href="/matches" className="btn btn-primary" style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+            <button
+              type="button"
+              onClick={handleBack}
+              className="btn btn-primary"
+              style={{ display: "inline-flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
+            >
               <ArrowLeft size={15} /> Back to Matches
-            </Link>
+            </button>
           </div>
         </main>
         <Footer />
@@ -711,20 +832,27 @@ function ProfileDetailPage({
               <span style={{ color: "var(--text-medium)", fontWeight: 600 }}>My Profile</span>
             ) : (
               <>
-                <Link
-                  href={backHref}
+                <button
+                  type="button"
+                  onClick={handleBack}
                   style={{
+                    background: "none",
+                    border: "none",
+                    padding: 0,
                     color: "var(--primary)",
                     textDecoration: "none",
                     display: "flex",
                     alignItems: "center",
                     gap: "4px",
                     fontWeight: 600,
+                    fontFamily: "inherit",
+                    fontSize: "0.8125rem",
+                    cursor: "pointer",
                   }}
                 >
                   <ArrowLeft size={13} />
                   {backLabel}
-                </Link>
+                </button>
                 <ChevronRight size={12} style={{ color: "#ccc" }} />
                 <span>{profile.name}</span>
               </>

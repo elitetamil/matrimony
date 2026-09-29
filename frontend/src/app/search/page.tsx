@@ -784,7 +784,7 @@ function SearchContent() {
                             cursor: "pointer",
                             transition: "box-shadow 0.15s",
                           }}
-                          onClick={() => router.push(`/profile/${p.id}`)}
+                          onClick={() => router.push(`/profile/${p.id}?from=search`)}
                         >
                           {/* Avatar */}
                           <div style={{

@@ -42,8 +42,19 @@ async function fetchProfileWithRetry(
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<RegisteredUser | null>(null);
+  const [user, setUserState] = useState<RegisteredUser | null>(null);
   const [loading, setLoading] = useState(true);
+
+  const setUser = useCallback((u: RegisteredUser | null) => {
+    setUserState(u);
+    if (typeof window !== "undefined") {
+      if (u?.id) {
+        localStorage.setItem("etm_active_profile_id", u.id);
+      } else {
+        localStorage.removeItem("etm_active_profile_id");
+      }
+    }
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -51,16 +62,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (data.user) {
       const profile = await fetchProfile(data.user.id);
       setUser(profile);
+    } else if (typeof window !== "undefined") {
+      const activeProfileId = localStorage.getItem("etm_active_profile_id");
+      if (activeProfileId) {
+        const profile = await fetchProfile(activeProfileId);
+        setUser(profile);
+      } else {
+        setUser(null);
+      }
     } else {
       setUser(null);
     }
     setLoading(false);
-  }, []);
+  }, [setUser]);
 
   const logout = useCallback(async () => {
     setUser(null);
     await doLogout();
-  }, []);
+  }, [setUser]);
 
   useEffect(() => {
     // Initial session load
@@ -68,6 +87,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (data.session?.user) {
         const profile = await fetchProfile(data.session.user.id);
         setUser(profile);
+      } else if (typeof window !== "undefined") {
+        const activeProfileId = localStorage.getItem("etm_active_profile_id");
+        if (activeProfileId) {
+          const profile = await fetchProfile(activeProfileId);
+          setUser(profile);
+        } else {
+          setUser(null);
+        }
       }
       setLoading(false);
     });
@@ -76,13 +103,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: listener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         // TOKEN_REFRESHED: Supabase silently refreshed the JWT in the background.
-        // The user profile has NOT changed. Skip loading/re-fetch entirely to
-        // prevent MatchesContent (and all other pages) from unmounting unnecessarily.
         if (event === "TOKEN_REFRESHED") return;
 
         if (session?.user) {
-          // Set loading immediately so no broken UI flash during fetch
-          setLoading(true);
           // For SIGNED_IN (new registration), retry in case profile row is being created
           const profile =
             event === "SIGNED_IN"
@@ -91,7 +114,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(profile);
           setLoading(false);
         } else {
-          setUser(null);
+          // Only reset to null if there is no fallback active profile stored in localStorage
+          const activeProfileId =
+            typeof window !== "undefined"
+              ? localStorage.getItem("etm_active_profile_id")
+              : null;
+          if (!activeProfileId) {
+            setUser(null);
+          }
           setLoading(false);
         }
       }
@@ -100,7 +130,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       listener.subscription.unsubscribe();
     };
-  }, []);
+  }, [setUser]);
 
   return (
     <AuthContext.Provider value={{ user, setUser, loading, refresh, logout }}>

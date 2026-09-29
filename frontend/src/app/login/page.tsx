@@ -6,11 +6,12 @@ import Navbar from "@/components/layout/Navbar";
 import Footer from "@/components/layout/Footer";
 import { Eye, EyeOff, AlertCircle, ChevronRight, Timer } from "lucide-react";
 import toast from "react-hot-toast";
-import { loginWithPassword, getProfilesByMobile, getProfilesByEmail, loginWithOtpSession, type RegisteredUser } from "@/lib/auth-store";
+import { loginWithPassword, getProfilesByMobile, getProfilesByEmail, loginWithOtpSession, loginToProfile, type RegisteredUser } from "@/lib/auth-store";
 import { checkRateLimit, recordFailedAttempt, clearRateLimit, formatCountdown } from "@/lib/rate-limit";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useMSG91, CAPTCHA_DIV_ID } from "@/hooks/useMSG91";
+import { validateEmail } from "@/lib/email-validator";
 
 // Detect if input is an email or phone number
 function detectInputType(value: string): "email" | "phone" | "unknown" {
@@ -145,7 +146,7 @@ function ProfilePicker({
 
 // ── Main Login Content ────────────────────────────────────────────────────────
 function LoginContent() {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
   const prefillMobile = searchParams.get("mobile") || "";
@@ -175,7 +176,7 @@ function LoginContent() {
     const state = getOtpCooldownState(OTP_SESSION_KEY);
     const remaining = Math.max(0, Math.ceil((state.unlocksAt - Date.now()) / 1000));
     if (remaining > 0) startResendCountdown(remaining);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [otpSent]);
 
   function startResendCountdown(seconds: number) {
@@ -215,7 +216,7 @@ function LoginContent() {
       setPwLocked(false);
       setPwLockRemaining(0);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, pwIdentifier]);
 
   // Also check on mount from cookies
@@ -224,7 +225,7 @@ function LoginContent() {
       const rl = checkRateLimit(pwIdentifier);
       if (!rl.allowed) startPwLockCountdown(rl.remainingMs);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function startPwLockCountdown(remainingMs: number) {
@@ -288,11 +289,19 @@ function LoginContent() {
     setOtpType(type);
 
     if (type === "email") {
+      const emailValidation = validateEmail(val);
+      if (!emailValidation.valid) {
+        const msg = emailValidation.error || "Please enter a valid Gmail address.";
+        setFieldErrors((p) => ({ ...p, otpId: msg }));
+        toast.error(msg);
+        setLoading(false);
+        return;
+      }
       try {
         const res = await fetch("/api/send-email-otp", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ email: val }),
+          body: JSON.stringify({ email: val.trim() }),
         });
         const data = await res.json();
         if (!res.ok) {
@@ -310,8 +319,8 @@ function LoginContent() {
       if (msg91.initError) {
         toast.error(
           msg91.initError.includes("not configured")
-            ? "OTP service is not configured. Please contact support."
-            : "OTP service failed to load. Please refresh the page and try again."
+            ? "SMS OTP is not configured. Please add MSG91 credentials to .env.local or sign in with Email OTP / Password."
+            : msg91.initError
         );
         setLoading(false);
         return;
@@ -352,7 +361,7 @@ function LoginContent() {
       autosendTriggered.current = true;
       executeSendOtp(prefillMobile);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autosend, prefillMobile]);
 
   // ── Resend OTP ────────────────────────────────────────────────────────────
@@ -368,6 +377,11 @@ function LoginContent() {
       toast.success("OTP resent successfully.");
     } else {
       // Email resend — re-call send OTP endpoint
+      const emailValidation = validateEmail(otpIdentifier);
+      if (!emailValidation.valid) {
+        toast.error(emailValidation.error || "Please enter a valid Gmail address.");
+        return;
+      }
       try {
         const res = await fetch("/api/send-email-otp", {
           method: "POST",
@@ -449,6 +463,7 @@ function LoginContent() {
         const result = await loginWithOtpSession(loginData.access_token, loginData.refresh_token);
         setLoading(false);
         if (!result) { toast.error("Login failed. Please try again or re-register."); return; }
+        setUser(result);
         toast.success("Login successful!");
         router.push("/");
         return;
@@ -484,29 +499,41 @@ function LoginContent() {
       return;
     }
     if (profiles.length === 1) {
+      const targetId = profiles[0].id;
       const res = await fetch("/api/otp-login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId: profiles[0].id }),
+        body: JSON.stringify({ profileId: targetId }),
       });
       const loginData = await res.json();
-      if (!res.ok) {
-        setLoading(false);
-        toast.error(loginData.error || "Login failed. Please try again.");
+      if (res.ok && loginData.access_token) {
+        const result = await loginWithOtpSession(loginData.access_token, loginData.refresh_token);
+        if (result) {
+          setLoading(false);
+          setUser(result);
+          toast.success("Login successful!");
+          router.push("/");
+          return;
+        }
+      }
+
+      // Fallback: client-side session login for legacy profiles
+      const fallbackUser = await loginToProfile(targetId);
+      setLoading(false);
+      if (fallbackUser) {
+        setUser(fallbackUser);
+        toast.success("Login successful!");
+        router.push("/");
         return;
       }
-      const result = await loginWithOtpSession(loginData.access_token, loginData.refresh_token);
-      setLoading(false);
-      if (!result) { toast.error("Login failed. Please try again or re-register."); return; }
-      toast.success("Login successful!");
-      router.push("/");
+
+      toast.error(loginData.error || "Login failed. Please try again.");
       return;
     }
     setLoading(false);
     setMultiProfiles(profiles);
   };
 
-  // ── Select profile ────────────────────────────────────────────────────────
   const handleSelectProfile = async (profileId: string) => {
     setLoading(true);
     try {
@@ -516,19 +543,31 @@ function LoginContent() {
         body: JSON.stringify({ profileId }),
       });
       const tokenData = await res.json();
-      if (!res.ok) {
-        toast.error(tokenData.error || "Login failed. Please try again.");
-        setLoading(false);
+      if (res.ok && tokenData.access_token) {
+        const result = await loginWithOtpSession(tokenData.access_token, tokenData.refresh_token);
+        if (result) {
+          setUser(result);
+          toast.success("Login successful!");
+          router.push("/");
+          return;
+        }
+      }
+
+      // Fallback: Use client-side profile login handler (works even without service role key)
+      const fallbackUser = await loginToProfile(profileId);
+      if (fallbackUser) {
+        setUser(fallbackUser);
+        toast.success("Login successful!");
+        router.push("/");
         return;
       }
-      const result = await loginWithOtpSession(tokenData.access_token, tokenData.refresh_token);
-      if (!result) { toast.error("Login failed. Please try again or re-register."); setLoading(false); return; }
-      toast.success("Login successful!");
-      router.push("/");
+
+      toast.error(tokenData.error || "Login failed. Please try again.");
     } catch {
       toast.error("Failed to login to this profile. Please try again.");
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   // ── Password login with rate limiting ─────────────────────────────────────
@@ -543,8 +582,14 @@ function LoginContent() {
     }
 
     const newErrors: Record<string, string> = {};
-    if (!pwIdentifier) newErrors.email = "Email or mobile number is required.";
-    else if (pwIdentifier.includes("@") && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(pwIdentifier)) newErrors.email = "Email address is invalid.";
+    if (!pwIdentifier) {
+      newErrors.email = "Email or mobile number is required.";
+    } else if (pwIdentifier.includes("@")) {
+      const emailValidation = validateEmail(pwIdentifier);
+      if (!emailValidation.valid) {
+        newErrors.email = emailValidation.error || "Please enter a valid Gmail address.";
+      }
+    }
     if (!password) newErrors.password = "Password is required.";
     else if (password.length < 6) newErrors.password = "Password must be at least 6 characters.";
     if (Object.keys(newErrors).length > 0) { setFieldErrors((p) => ({ ...p, ...newErrors })); return; }
@@ -572,6 +617,7 @@ function LoginContent() {
 
     // Success — clear rate limit
     clearRateLimit(pwIdentifier);
+    setUser(loggedIn);
     toast.success("Login successful!");
     router.push("/");
   };
@@ -589,7 +635,19 @@ function LoginContent() {
     <>
       <div id={CAPTCHA_DIV_ID} style={{ position: "fixed", bottom: "1rem", right: "1rem", zIndex: 0 }} />
       <Navbar />
-      <main style={{ background: "var(--bg-page)", minHeight: "calc(100vh - 120px)", display: "flex", alignItems: "center", padding: "2.5rem 0" }}>
+      <main
+        style={{
+          backgroundImage: "linear-gradient(rgba(250, 246, 241, 0.82), rgba(250, 246, 241, 0.82)), url('/images/Bg.jpeg')",
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          backgroundRepeat: "no-repeat",
+          backgroundAttachment: "fixed",
+          minHeight: "calc(100vh - 120px)",
+          display: "flex",
+          alignItems: "center",
+          padding: "2.5rem 0",
+        }}
+      >
         <div className="container">
           <div style={{ display: "flex", justifyContent: "center" }}>
             <div style={{ width: "100%", maxWidth: "420px" }}>
@@ -638,9 +696,9 @@ function LoginContent() {
                             <FieldError msg={fieldErrors.otpId} />
                             {!fieldErrors.otpId && otpIdentifier && (
                               <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.25rem" }}>
-                                {inputType === "email" ? "✉️ OTP will be sent to this email via Resend" :
-                                 inputType === "phone" ? "📱 OTP will be sent via SMS to this number" :
-                                 "Enter a valid email or 10-digit mobile number"}
+                                {inputType === "email" ? "✉️ OTP will be sent to this email address" :
+                                  inputType === "phone" ? "📱 OTP will be sent via SMS to this number" :
+                                    "Enter a valid email or 10-digit mobile number"}
                               </p>
                             )}
                           </div>

@@ -156,7 +156,7 @@ function ShortlistedContent() {
               {shortlisted.map((profile) => (
                 <div key={profile.id} style={{ position: "relative" }}>
                   {/* @ts-ignore */}
-                  <ProfileCard profile={profile} variant="full" />
+                  <ProfileCard profile={profile} variant="full" from="shortlisted" />
                   <button
                     onClick={() => remove(profile.id)}
                     style={{

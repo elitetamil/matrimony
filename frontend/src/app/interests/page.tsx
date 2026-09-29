@@ -141,7 +141,7 @@ function ReceivedCard({
       }}
     >
       {/* Photo */}
-      <Link href={`/profile/${p.id}`} style={{ display: "block", flexShrink: 0, width: "148px" }}>
+      <Link href={`/profile/${p.id}?from=interests`} style={{ display: "block", flexShrink: 0, width: "148px" }}>
         {photo
           ? <img src={photo} alt={p.name} style={{ width: "148px", height: "200px", objectFit: "cover", objectPosition: "top", display: "block" }} />
           : <GenderAvatar gender={p.gender} size={200} />}
@@ -162,7 +162,7 @@ function ReceivedCard({
 
         {/* Name */}
         <Link
-          href={`/profile/${p.id}`}
+          href={`/profile/${p.id}?from=interests`}
           style={{ fontSize: "1.0625rem", fontWeight: 700, color: "#111", textDecoration: "none", marginBottom: "2px" }}
         >
           {p.name}
@@ -319,7 +319,7 @@ function SentCard({
       }}
     >
       {/* Photo */}
-      <Link href={`/profile/${p.id}`} style={{ display: "block", flexShrink: 0, width: "148px" }}>
+      <Link href={`/profile/${p.id}?from=interests`} style={{ display: "block", flexShrink: 0, width: "148px" }}>
         {photo
           ? <img src={photo} alt={p.name} style={{ width: "148px", height: "200px", objectFit: "cover", objectPosition: "top", display: "block" }} />
           : <GenderAvatar gender={p.gender} size={200} />}
@@ -340,7 +340,7 @@ function SentCard({
 
         {/* Name */}
         <Link
-          href={`/profile/${p.id}`}
+          href={`/profile/${p.id}?from=interests`}
           style={{ fontSize: "1.0625rem", fontWeight: 700, color: "#111", textDecoration: "none", marginBottom: "2px" }}
         >
           {p.name}
@@ -404,7 +404,7 @@ function SentCard({
 
           {/* View Profile */}
           <Link
-            href={`/profile/${p.id}`}
+            href={`/profile/${p.id}?from=interests`}
             style={{
               display: "flex", alignItems: "center", gap: "5px",
               padding: "0.4375rem 1.125rem",

@@ -101,6 +101,7 @@ export default function AboutPage() {
 
             {/* What We Stand For (Values Grid) */}
             <section
+              id="values"
               style={{
                 background: "#fff",
                 border: "1px solid #E5D5C5",
