@@ -9,13 +9,14 @@ import {
   Home, ChevronDown, ChevronRight, ChevronLeft, ArrowRight, CheckCircle, CheckCircle2,
   Circle, Shield, Users, Star, Crown, Camera, Briefcase, FileText, MapPin, Heart,
   Users2, Sparkles, Eye, Search, User, Settings, Settings2, Mail, X, RefreshCw,
-  Clock, Bookmark, Info, MessageSquare, Send, Bell, Check
+  Clock, Bookmark, Info, MessageSquare, Send, Bell, Check, AlertCircle
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
+import { useMembership } from "@/hooks/useMembership";
 import { validateEmail } from "@/lib/email-validator";
 import ProfileCard from "@/components/ui/ProfileCard";
-import { PROFILE_FOR_OPTIONS } from "@/data/matrimony-data";
+import { PROFILE_FOR_OPTIONS, RELIGIONS, MOTHER_TONGUES } from "@/data/matrimony-data";
 import {
   fetchMatchProfiles,
   fetchLatestProfiles,
@@ -473,6 +474,7 @@ function HeroAuthCard() {
 
 function AuthenticatedDashboard() {
   const { user, setUser, refresh } = useAuth();
+  const { isPremium } = useMembership();
   const router = useRouter();
   const [dailyRecs, setDailyRecs] = useState<RegisteredUser[]>([]);
   const [viewedMeProfiles, setViewedMeProfiles] = useState<RegisteredUser[]>([]);
@@ -703,8 +705,8 @@ function AuthenticatedDashboard() {
   const hasEducation = !!(user.education && user.education !== "—");
   const hasCareer = !!(user.occupation && user.occupation !== "—");
   const hasPartnerPrefs = !!(user.partnerAgeMin || user.partnerAgeMax || user.partnerReligion || user.partnerCaste || user.partnerEducation);
-  const hasFamilyDetails = !!(user.fatherOccupation || user.motherOccupation || user.familyStatus || user.familyType);
-  const hasMorePhotos = !!(user.photos && user.photos.length > 1) || (!!user.photoUrl && !!user.photos && user.photos.length > 0);
+  const hasFamilyDetails = !!(user.fatherOccupation || user.motherOccupation || user.familyStatus || user.familyType || user.nativePlace);
+  const hasMorePhotos = !!(user.photos && user.photos.length > 1);
 
   return (
     <div style={{ background: "#FAF6F0", minHeight: "100vh", fontFamily: "var(--font-sans)" }}>
@@ -875,7 +877,7 @@ function AuthenticatedDashboard() {
                   transition: "all 0.15s ease",
                 }}
               >
-                Complete Profile &rarr;
+                {pct >= 100 ? "Edit Profile ✏️" : "Complete Profile →"}
               </Link>
             </div>
 
@@ -978,35 +980,66 @@ function AuthenticatedDashboard() {
             <div
               style={{
                 margin: "0.5rem 0.875rem 1rem",
-                background: "linear-gradient(135deg, #FFF9F5 0%, #FFF3EC 100%)",
-                border: "1px solid #F5E0D5",
+                background: isPremium 
+                  ? "linear-gradient(135deg, #FFF9F0 0%, #FFF0DC 100%)" 
+                  : "linear-gradient(135deg, #FFF9F5 0%, #FFF3EC 100%)",
+                border: isPremium ? "1px solid #F5DAB0" : "1px solid #F5E0D5",
                 borderRadius: "10px",
                 padding: "0.875rem 0.75rem",
                 textAlign: "center",
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", color: "#C8973A", fontWeight: 800, fontSize: "0.75rem", marginBottom: "3px" }}>
-                <Crown size={14} fill="#C8973A" /> Unlock More Connections
-              </div>
-              <p style={{ fontSize: "0.6875rem", color: "#7A5060", margin: "0 0 0.625rem", lineHeight: 1.35 }}>
-                Get access to messaging, advanced search and more.
-              </p>
-              <Link
-                href="/membership"
-                style={{
-                  display: "block",
-                  background: "#6B1A2A",
-                  color: "#FFFFFF",
-                  padding: "0.4rem 0.75rem",
-                  borderRadius: "20px",
-                  fontSize: "0.75rem",
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  transition: "background 0.15s",
-                }}
-              >
-                Explore Premium &rarr;
-              </Link>
+              {isPremium ? (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", color: "#C8973A", fontWeight: 800, fontSize: "0.75rem", marginBottom: "3px" }}>
+                    <Crown size={14} fill="#C8973A" /> Active Premium Member
+                  </div>
+                  <p style={{ fontSize: "0.6875rem", color: "#7A5060", margin: "0 0 0.625rem", lineHeight: 1.35 }}>
+                    You have full access to messaging, verified profiles, &amp; priority matching.
+                  </p>
+                  <Link
+                    href="/membership"
+                    style={{
+                      display: "block",
+                      background: "#6B1A2A",
+                      color: "#FFFFFF",
+                      padding: "0.4rem 0.75rem",
+                      borderRadius: "20px",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      textDecoration: "none",
+                      transition: "background 0.15s",
+                    }}
+                  >
+                    View Plan Details &rarr;
+                  </Link>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "5px", color: "#C8973A", fontWeight: 800, fontSize: "0.75rem", marginBottom: "3px" }}>
+                    <Crown size={14} fill="#C8973A" /> Unlock More Connections
+                  </div>
+                  <p style={{ fontSize: "0.6875rem", color: "#7A5060", margin: "0 0 0.625rem", lineHeight: 1.35 }}>
+                    Get access to messaging, advanced search and more.
+                  </p>
+                  <Link
+                    href="/membership"
+                    style={{
+                      display: "block",
+                      background: "#6B1A2A",
+                      color: "#FFFFFF",
+                      padding: "0.4rem 0.75rem",
+                      borderRadius: "20px",
+                      fontSize: "0.75rem",
+                      fontWeight: 700,
+                      textDecoration: "none",
+                      transition: "background 0.15s",
+                    }}
+                  >
+                    Explore Premium &rarr;
+                  </Link>
+                </>
+              )}
             </div>
           </div>
         </aside>
@@ -1652,7 +1685,7 @@ function AuthenticatedDashboard() {
         {/* ========================================================================= */}
         <aside className="dash-right-sidebar">
 
-          {/* ── CARD 1: Premium Membership ── */}
+          {/* ── CARD 1: Premium Membership Status / Upgrade ── */}
           <div
             style={{
               background: "#FFFFFF",
@@ -1665,14 +1698,16 @@ function AuthenticatedDashboard() {
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "4px" }}>
               <Crown size={18} color="#C8973A" fill="#C8973A" />
               <h3 style={{ fontSize: "0.9375rem", fontWeight: 800, color: "#2D1018", margin: 0 }}>
-                Premium Membership
+                {isPremium ? "Active Membership" : "Premium Membership"}
               </h3>
             </div>
             <p style={{ fontSize: "0.6875rem", color: "#8B6070", margin: "0 0 0.875rem", lineHeight: 1.35 }}>
-              Unlock more features for a better matrimonial experience.
+              {isPremium
+                ? "You are currently enjoying full access to all premium features."
+                : "Unlock more features for a better matrimonial experience."}
             </p>
 
-            {/* Checklist */}
+            {/* Benefits Checklist */}
             <div style={{ display: "flex", flexDirection: "column", gap: "6px", marginBottom: "1rem" }}>
               {[
                 "Unlimited messaging",
@@ -1682,7 +1717,7 @@ function AuthenticatedDashboard() {
                 "Assisted matchmaking",
               ].map((benefit) => (
                 <div key={benefit} style={{ display: "flex", alignItems: "center", gap: "7px", fontSize: "0.75rem", color: "#3D2028", fontWeight: 500 }}>
-                  <Check size={13} color="#C84B60" strokeWidth={3} />
+                  <Check size={13} color={isPremium ? "#2E7D32" : "#C84B60"} strokeWidth={3} />
                   {benefit}
                 </div>
               ))}
@@ -1703,7 +1738,7 @@ function AuthenticatedDashboard() {
                 transition: "background 0.15s",
               }}
             >
-              Upgrade Now &rarr;
+              {isPremium ? "Manage Membership →" : "Upgrade Now →"}
             </Link>
           </div>
 
@@ -1783,7 +1818,7 @@ function AuthenticatedDashboard() {
                 textAlign: "center",
               }}
             >
-              Complete Profile &rarr;
+              {pct >= 100 ? "Edit Profile ✏️" : "Complete Profile →"}
             </Link>
           </div>
 
@@ -2207,6 +2242,43 @@ function GuestSuccessStories() {
 
 export default function HomePage() {
   const { user, loading } = useAuth();
+  const router = useRouter();
+
+  // Landing Page Hero Search State
+  const [lookingFor, setLookingFor] = useState("");
+  const [ageMin, setAgeMin] = useState<number | "">("");
+  const [ageMax, setAgeMax] = useState<number | "">("");
+  const [heroReligion, setHeroReligion] = useState("");
+  const [heroMotherTongue, setHeroMotherTongue] = useState("");
+  const [searchError, setSearchError] = useState("");
+
+  const handleMinAgeChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const val = e.target.value ? Number(e.target.value) : "";
+    setAgeMin(val);
+    if (val !== "" && ageMax !== "" && val > ageMax) {
+      setAgeMax("");
+    }
+  };
+
+  const handleHeroSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setSearchError("");
+
+    if (!lookingFor) { setSearchError("Please select who you are looking for."); return; }
+    if (!ageMin || !ageMax) { setSearchError("Please select a valid age range."); return; }
+    if (ageMin > ageMax) { setSearchError("Minimum age cannot be greater than maximum age."); return; }
+    if (!heroReligion) { setSearchError("Please select a religion."); return; }
+    if (!heroMotherTongue) { setSearchError("Please select a mother tongue."); return; }
+
+    const params = new URLSearchParams({
+      lookingFor,
+      partnerAgeMin: String(ageMin),
+      partnerAgeMax: String(ageMax),
+      religion: heroReligion,
+      motherTongue: heroMotherTongue
+    });
+    router.push(`/register?${params.toString()}`);
+  };
 
   // While auth is resolving, show a minimal spinner to avoid flash of guest UI
   if (loading) {
@@ -2238,134 +2310,171 @@ export default function HomePage() {
           className="hero-banner-full"
           style={{
             position: "relative",
-            background: "linear-gradient(90deg, rgba(255,248,240,0.95) 0%, rgba(255,248,240,0.85) 45%, rgba(255,248,240,0.3) 100%), url('/images/Decor.jpeg') center/cover no-repeat",
-            padding: "calc(var(--navbar-height, 72px) + 1rem) 0 2.25rem",
+            background: "radial-gradient(ellipse at center 35%, rgba(0, 0, 0, 0.42) 0%, rgba(0, 0, 0, 0.18) 50%, transparent 80%), url('/images/Background.jpeg') center 18% / cover no-repeat",
+            padding: "calc(var(--navbar-height, 72px) + 2rem) 0 2.5rem",
             overflow: "hidden",
+            minHeight: "560px",
+            display: "flex",
+            flexDirection: "column",
+            justifyContent: "space-between",
           }}
         >
-          <div className="container" style={{ maxWidth: "1140px", margin: "0 auto", padding: "0 1.25rem" }}>
+          <div
+            className="container"
+            style={{
+              maxWidth: "1140px",
+              margin: "0 auto",
+              padding: "0 1.25rem",
+              width: "100%",
+              display: "flex",
+              flexDirection: "column",
+              justifyContent: "space-between",
+              flex: 1,
+            }}
+          >
+            {/* Centered Hero Text */}
             <div
               style={{
-                display: "grid",
-                gridTemplateColumns: "1fr",
-                gap: "2rem",
+                maxWidth: "960px",
+                margin: "0 auto 2.5rem auto",
+                textAlign: "center",
+                display: "flex",
+                flexDirection: "column",
                 alignItems: "center",
+                width: "100%",
               }}
-              className="hero-grid-responsive"
             >
-              {/* Left Column: Text Content & Dual CTA Buttons */}
-              <div style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
-                <div style={{ fontSize: "1 rem", fontWeight: 700, letterSpacing: "0.12em", color: "var(--primary)", textTransform: "uppercase" }}>
-                  ELITE TAMIL MATRIMONY
-                </div>
-
-                <h1
-                  style={{
-                    fontSize: "clamp(2.25rem, 4.5vw, 3.5rem)",
-                    fontWeight: 800,
-                    color: "var(--text-dark)",
-                    lineHeight: 1.15,
-                    letterSpacing: "-0.02em",
-                    margin: 0,
-                  }}
-                >
-                  Tradition Meets <br />
-                  <span style={{ color: "var(--primary)" }}>True Connections</span>
-                </h1>
-
-                <p
-                  style={{
-                    fontSize: "1.0625rem",
-                    color: "var(--text-medium)",
-                    lineHeight: 1.6,
-                    maxWidth: "480px",
-                    margin: 0,
-                  }}
-                >
-                  Find your life partner from a trusted community where values, culture and love come together.
-                </p>
-
-                <div style={{ display: "flex", alignItems: "center", gap: "0.875rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
-                  <Link
-                    href="/register"
-                    style={{
-                      background: "var(--primary)",
-                      color: "#fff",
-                      borderRadius: "var(--radius-full)",
-                      padding: "0.8125rem 2rem",
-                      fontSize: "0.9375rem",
-                      fontWeight: 700,
-                      textDecoration: "none",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: "0.5rem",
-                      boxShadow: "var(--shadow-md)",
-                      transition: "all 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.background = "var(--primary-dark)")}
-                    onMouseLeave={(e) => (e.currentTarget.style.background = "var(--primary)")}
-                  >
-                    Create Your Profile
-                    <ArrowRight size={18} />
-                  </Link>
-
-                  <Link
-                    href="/matches"
-                    style={{
-                      border: "1.5px solid var(--secondary)",
-                      color: "var(--text-dark)",
-                      background: "#fff",
-                      borderRadius: "var(--radius-full)",
-                      padding: "0.8125rem 1.75rem",
-                      fontSize: "0.9375rem",
-                      fontWeight: 700,
-                      textDecoration: "none",
-                      display: "inline-flex",
-                      alignItems: "center",
-                      transition: "all 0.2s ease",
-                    }}
-                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--secondary-light)"; }}
-                    onMouseLeave={(e) => { e.currentTarget.style.background = "#fff"; }}
-                  >
-                    Browse Matches
-                  </Link>
-                </div>
-              </div>
-
-              {/* Right Column / Corner: Hero Visual with Clean Wedding Image */}
               <div
                 style={{
-                  width: "100%",
-                  borderRadius: "28px",
-                  overflow: "hidden",
-                  boxShadow: "0 12px 36px rgba(107,26,42,0.15)",
-                  border: "1.5px solid rgba(255,255,255,0.8)",
-                  maxHeight: "440px",
-                  background: "#fff",
+                  fontSize: "0.9375rem",
+                  fontWeight: 800,
+                  letterSpacing: "0.18em",
+                  color: "#E0C070",
+                  textTransform: "uppercase",
+                  marginBottom: "0.875rem",
+                  fontFamily: "'Montserrat', 'Poppins', 'Inter', var(--font-sans)",
+                  textShadow: "0 2px 4px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 1)",
                 }}
               >
-                <img
-                  src="/images/Romantic Wedding Couple.jpeg"
-                  alt="Elite Tamil Matrimony Sangeet Wedding Couple"
-                  style={{
-                    width: "100%",
-                    height: "100%",
-                    maxHeight: "440px",
-                    objectFit: "cover",
-                    objectPosition: "top center",
-                    display: "block",
-                  }}
-                />
+                ELITE TAMIL MATRIMONY
               </div>
+
+              <h1
+                style={{
+                  fontFamily: "var(--font-heading)",
+                  fontSize: "clamp(2.5rem, 5.5vw, 4.25rem)",
+                  fontWeight: 700,
+                  lineHeight: 1.15,
+                  letterSpacing: "-0.01em",
+                  margin: "0 0 1rem 0",
+                  textShadow: "0 2px 10px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.7)",
+                }}
+              >
+                <span style={{ display: "block", color: "#FFFDF8" }}>Tradition Meets</span>
+                <span style={{ display: "block", color: "#E0C070", whiteSpace: "nowrap" }}>True Connections</span>
+              </h1>
+
+              <p
+                style={{
+                  fontSize: "clamp(1.0625rem, 2vw, 1.25rem)",
+                  color: "#FFFDF8",
+                  lineHeight: 1.6,
+                  maxWidth: "680px",
+                  margin: "0 auto",
+                  fontWeight: 400,
+                  fontFamily: "var(--font-sans)",
+                  textShadow: "0 1px 4px rgba(0, 0, 0, 0.7)",
+                }}
+              >
+                Find your life partner from a trusted community where values, culture and love come together.
+              </p>
             </div>
 
-            <style>{`
-              @media (min-width: 992px) {
-                .hero-grid-responsive {
-                  grid-template-columns: 1.1fr 1fr !important;
-                }
-              }
-            `}</style>
+            {/* HORIZONTAL SEARCH FORM (Integrated into existing Hero) */}
+            <div
+              style={{
+                position: "relative",
+                zIndex: 10,
+                background: "rgba(0, 0, 0, 0.48)",
+                backdropFilter: "blur(12px)",
+                WebkitBackdropFilter: "blur(12px)",
+                padding: "1.25rem 1.5rem",
+                borderRadius: "14px",
+                border: "1px solid rgba(255, 255, 255, 0.2)",
+                boxShadow: "0 12px 36px rgba(0, 0, 0, 0.3)",
+                width: "100%",
+              }}
+            >
+              <form onSubmit={handleHeroSearch} style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "flex-end" }}>
+                {/* Looking For */}
+                <div style={{ flex: "1 1 130px" }}>
+                  <label style={{ display: "block", color: "#ffffff", fontSize: "0.8125rem", fontWeight: 600, marginBottom: "0.4rem", textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)" }}>
+                    I&apos;m looking for a
+                  </label>
+                  <select className="form-select" value={lookingFor} onChange={(e) => setLookingFor(e.target.value)} style={{ background: "#ffffff url('data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23333%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22/%3E%3C/svg%3E') no-repeat right 0.75rem center / 14px", appearance: "none", paddingRight: "2rem", border: "1px solid #d1d5db", color: "#111827", borderRadius: "6px" }}>
+                    <option value="" disabled>Select</option>
+                    <option value="Woman">Woman</option>
+                    <option value="Man">Man</option>
+                  </select>
+                </div>
+
+                {/* Age Range */}
+                <div style={{ flex: "1 1 180px" }}>
+                  <label style={{ display: "block", color: "#ffffff", fontSize: "0.8125rem", fontWeight: 600, marginBottom: "0.4rem", textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)" }}>
+                    aged
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                    <select className="form-select" value={ageMin} onChange={handleMinAgeChange} style={{ background: "#ffffff url('data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23333%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22/%3E%3C/svg%3E') no-repeat right 0.75rem center / 14px", appearance: "none", paddingRight: "1.75rem", border: "1px solid #d1d5db", color: "#111827", borderRadius: "6px" }}>
+                      <option value="" disabled>Select</option>
+                      {Array.from({ length: 35 }, (_, i) => i + 18).map(y => <option key={`min-${y}`} value={y}>{y}</option>)}
+                    </select>
+                    <span style={{ color: "#ffffff", fontSize: "0.875rem", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0, textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)" }}>to</span>
+                    <select className="form-select" value={ageMax} onChange={(e) => setAgeMax(e.target.value ? Number(e.target.value) : "")} style={{ background: "#ffffff url('data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23333%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22/%3E%3C/svg%3E') no-repeat right 0.75rem center / 14px", appearance: "none", paddingRight: "1.75rem", border: "1px solid #d1d5db", color: "#111827", borderRadius: "6px" }}>
+                      <option value="" disabled>Select</option>
+                      {Array.from({ length: 35 }, (_, i) => i + 18).map(y => (
+                        <option key={`max-${y}`} value={y} disabled={ageMin !== "" && y < (ageMin as number)}>
+                          {y}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                {/* Religion */}
+                <div style={{ flex: "1 1 150px" }}>
+                  <label style={{ display: "block", color: "#ffffff", fontSize: "0.8125rem", fontWeight: 600, marginBottom: "0.4rem", textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)" }}>
+                    of religion
+                  </label>
+                  <select className="form-select" value={heroReligion} onChange={(e) => setHeroReligion(e.target.value)} style={{ background: "#ffffff url('data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23333%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22/%3E%3C/svg%3E') no-repeat right 0.75rem center / 14px", appearance: "none", paddingRight: "2rem", border: "1px solid #d1d5db", color: "#111827", borderRadius: "6px" }}>
+                    <option value="" disabled>Select</option>
+                    {RELIGIONS.map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+
+                {/* Mother Tongue */}
+                <div style={{ flex: "1 1 150px" }}>
+                  <label style={{ display: "block", color: "#ffffff", fontSize: "0.8125rem", fontWeight: 600, marginBottom: "0.4rem", textShadow: "0 1px 2px rgba(0, 0, 0, 0.5)" }}>
+                    and mother tongue
+                  </label>
+                  <select className="form-select" value={heroMotherTongue} onChange={(e) => setHeroMotherTongue(e.target.value)} style={{ background: "#ffffff url('data:image/svg+xml;utf8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2214%22 height=%2214%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22%23333%22 stroke-width=%222%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22%3E%3Cpolyline points=%226 9 12 15 18 9%22/%3E%3C/svg%3E') no-repeat right 0.75rem center / 14px", appearance: "none", paddingRight: "2rem", border: "1px solid #d1d5db", color: "#111827", borderRadius: "6px" }}>
+                    <option value="" disabled>Select</option>
+                    {MOTHER_TONGUES.map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                </div>
+
+                {/* Let's Begin Button */}
+                <div style={{ flex: "1 1 120px" }}>
+                  <button type="submit" className="btn btn-primary" style={{ width: "100%", height: "42px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.875rem", fontWeight: 700, padding: "0 1.25rem", borderRadius: "6px", cursor: "pointer", boxShadow: "0 4px 14px rgba(107, 26, 42, 0.4)" }}>
+                    Let&apos;s Begin
+                  </button>
+                </div>
+              </form>
+              {searchError && (
+                <div style={{ color: "#ff8080", fontSize: "0.875rem", marginTop: "1rem", display: "flex", alignItems: "center", gap: "0.375rem", fontWeight: 600, textShadow: "0 1px 2px rgba(0, 0, 0, 0.6)" }}>
+                  <AlertCircle size={16} /> {searchError}
+                </div>
+              )}
+            </div>
           </div>
         </section>
 

@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
@@ -297,7 +297,7 @@ function ResetPasswordContent() {
           </div>
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
       <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </>
   );

@@ -5,7 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { Crown, Lock } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import { useAuth } from "@/context/AuthContext";
 import { useMembership } from "@/hooks/useMembership";
 import toast from "react-hot-toast";
@@ -1070,7 +1070,7 @@ function MatchesContent({ user, canMessage, canViewContact, initialTab, isPremiu
           </div>
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
 
       {/* Mobile-specific styles */}
       <style>{`
@@ -1183,7 +1183,7 @@ function MatchesGuard() {
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         </main>
-        <Footer />
+        <CompactFooter />
       </>
     );
   }

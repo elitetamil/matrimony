@@ -3,7 +3,7 @@
 import { Suspense, useState, useEffect } from "react";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import {
   RELIGIONS,
   MOTHER_TONGUES,
@@ -921,6 +921,7 @@ function SearchContent() {
           }
         }
       `}</style>
+      <CompactFooter />
     </>
   );
 }

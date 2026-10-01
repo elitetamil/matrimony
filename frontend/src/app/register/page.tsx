@@ -3,6 +3,7 @@
 import { Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { ChevronDown, ChevronLeft, Phone, Upload, X, Check, AlertCircle, Mail, Plus } from "lucide-react";
+import CompactFooter from "@/components/layout/CompactFooter";
 import toast from "react-hot-toast";
 import { registerUser, saveCompatibilityAnswers } from "@/lib/auth-store";
 import { uploadProfilePhoto } from "@/lib/supabase";
@@ -27,6 +28,13 @@ const INCOME_OPTIONS = INCOME_RANGES.map((r) => r.label);
 // Max DOB for 18+ validation — computed once at module load (never during render)
 const MAX_DOB_DATE = new Date(Date.now() - 18 * 365.25 * 24 * 60 * 60 * 1000).toISOString().split("T")[0];
 
+// Flattened unique list of all Indian cities for type-to-search/autocomplete
+const ALL_INDIAN_CITIES = Array.from(
+  new Set(
+    Object.values(CITIES_BY_STATE).flat().filter((c) => Boolean(c) && c !== "Other")
+  )
+).sort((a, b) => a.localeCompare(b));
+
 // DOB dropdown helpers
 const MONTHS = [
   { value: 1, label: "January" }, { value: 2, label: "February" }, { value: 3, label: "March" },
@@ -46,6 +54,70 @@ function dobPartsToString(day: string, month: string, year: string): string {
 
 const CURRENT_YEAR = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: 60 }, (_, i) => CURRENT_YEAR - 18 - i); // 18..78 years ago
+
+// ── Bio generator ──────────────────────────────────────────────────────────
+function generateBio(f: any): string {
+  const parts = [];
+  
+  let age = "";
+  if (f.dob) {
+    age = String(Math.floor((Date.now() - new Date(f.dob).getTime()) / (365.25 * 24 * 60 * 60 * 1000)));
+  }
+
+  let intro = "I am";
+  if (f.name) {
+    intro = `Hi, I am ${f.name}`;
+    if (age) intro += `, a ${age}-year-old`;
+    else intro += `, a`;
+  } else {
+    if (age) intro += ` a ${age}-year-old`;
+    else intro += ` a`;
+  }
+
+  if (f.occupation) {
+    intro += ` ${f.occupation.toLowerCase()}`;
+  } else {
+    intro += ` professional`;
+  }
+
+  if (f.city || f.state) {
+    const loc = [f.city, f.state].filter(Boolean).join(", ");
+    intro += ` based in ${loc}`;
+  }
+  parts.push(intro + ".");
+
+  if (f.education) {
+    parts.push(`I hold a degree in ${f.education}.`);
+  }
+
+  const background = [];
+  if (f.religion) background.push(f.religion);
+  if (f.caste) background.push(f.caste);
+  if (background.length > 0) {
+    parts.push(`I come from a ${background.join(", ")} family.`);
+  }
+
+  if (f.diet) {
+    parts.push(`In terms of lifestyle, I am a ${f.diet.toLowerCase()} by diet.`);
+  }
+
+  let partner = "I am looking for a kind, understanding, and supportive partner";
+  const pPrefs = [];
+  if (f.partnerReligion && f.partnerReligion !== "Any") {
+    pPrefs.push(f.partnerReligion);
+  }
+  if (f.partnerState && f.partnerState !== "Any") {
+    pPrefs.push(`from ${f.partnerState}`);
+  }
+  if (pPrefs.length > 0) {
+    partner += ` who is ${pPrefs.join(" ")}`;
+  }
+  partner += " to build a happy life together.";
+  
+  parts.push(partner);
+
+  return parts.join(" ");
+}
 
 // ── Inline field error display ────────────────────────────────────────────
 function FieldError({ msg }: { msg?: string }) {
@@ -181,14 +253,21 @@ function FloatSearchableCombobox({ label, value, onChange, options, placeholder 
   const [query, setQuery] = useState(value);
   const [open, setOpen] = useState(false);
   const [dropup, setDropup] = useState(false);
+  const [isTyping, setIsTyping] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => { setQuery(value); }, [value]);
+  useEffect(() => {
+    setQuery(value);
+    if (!value) setIsTyping(false);
+  }, [value]);
 
   useEffect(() => {
     const handler = (e: MouseEvent | TouchEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setIsTyping(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     document.addEventListener("touchstart", handler, { passive: true });
@@ -198,13 +277,16 @@ function FloatSearchableCombobox({ label, value, onChange, options, placeholder 
     };
   }, []);
 
-  // All options when empty query, filtered with includes when typing
-  const filtered = query && query !== value
+  // Filter with case-insensitive includes when typing, or show all options on focus/clear
+  const trimmed = query.trim().toLowerCase();
+  const shouldFilter = isTyping && trimmed.length > 0;
+
+  const filtered = shouldFilter
     ? options
-        .filter(o => o.toLowerCase().includes(query.toLowerCase()))
+        .filter(o => o.toLowerCase().includes(trimmed))
         .sort((a, b) => {
-          const aStarts = a.toLowerCase().startsWith(query.toLowerCase());
-          const bStarts = b.toLowerCase().startsWith(query.toLowerCase());
+          const aStarts = a.toLowerCase().startsWith(trimmed);
+          const bStarts = b.toLowerCase().startsWith(trimmed);
           if (aStarts && !bStarts) return -1;
           if (!aStarts && bStarts) return 1;
           return a.localeCompare(b);
@@ -213,6 +295,7 @@ function FloatSearchableCombobox({ label, value, onChange, options, placeholder 
     : options;
 
   const handleOpen = () => {
+    setIsTyping(false);
     setOpen(true);
     // Detect if we should open upward (dropup) to avoid keyboard
     if (inputRef.current) {
@@ -226,6 +309,7 @@ function FloatSearchableCombobox({ label, value, onChange, options, placeholder 
 
   const select = (v: string) => {
     setQuery(v);
+    setIsTyping(false);
     onChange(v);
     setOpen(false);
   };
@@ -243,8 +327,22 @@ function FloatSearchableCombobox({ label, value, onChange, options, placeholder 
           paddingBottom: query ? "0.375rem" : "0.75rem",
           fontSize: "16px",
         }}
-        onChange={e => { setQuery(e.target.value); onChange(e.target.value); setOpen(true); }}
+        onChange={e => {
+          setIsTyping(true);
+          setQuery(e.target.value);
+          onChange(e.target.value);
+          setOpen(true);
+        }}
         onFocus={handleOpen}
+        onKeyDown={e => {
+          if (e.key === "Escape") {
+            setOpen(false);
+            setIsTyping(false);
+          } else if (e.key === "Enter" && open && filtered.length > 0) {
+            e.preventDefault();
+            select(filtered[0]);
+          }
+        }}
         autoComplete="off"
         aria-label={label}
       />
@@ -264,7 +362,7 @@ function FloatSearchableCombobox({ label, value, onChange, options, placeholder 
         }}>
           {filtered.length === 0 && query.trim() && (
             <div
-              style={{ padding: "0.625rem 0.875rem", fontSize: "0.8125rem", color: "var(--text-muted)" }}
+              style={{ padding: "0.625rem 0.875rem", fontSize: "0.8125rem", color: "var(--text-muted)", cursor: "pointer" }}
               onMouseDown={(e) => { e.preventDefault(); select(query); }}
             >
               Use &ldquo;{query}&rdquo; as custom {label.toLowerCase()}
@@ -457,7 +555,7 @@ function MultiSelectTags({ label, values, onChange, options, placeholder = "Sele
 
 // ---- Step progress bar ----
 function StepProgressBar({ step, total }: { step: number; total: number }) {
-  const pct = Math.round(((step) / total) * 100);
+  const pct = Math.round(((step - 1) / total) * 100);
   return (
     <div style={{ marginBottom: "0.375rem" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.125rem" }}>
@@ -513,6 +611,14 @@ function RegisterWizard() {
   const initName = searchParams.get("name") || "";
   const initMobile = searchParams.get("mobile") || "";
   const initEmail = searchParams.get("email") || ""; // prefilled from login "Create Account" flow
+  
+  // Landing page search parameters
+  const initLookingFor = searchParams.get("lookingFor") || ""; // "Woman" or "Man"
+  const initPartnerGender = initLookingFor.toLowerCase() === "woman" ? "female" : initLookingFor.toLowerCase() === "man" ? "male" : "";
+  const initPartnerAgeMin = searchParams.get("partnerAgeMin") ? Number(searchParams.get("partnerAgeMin")) : undefined;
+  const initPartnerAgeMax = searchParams.get("partnerAgeMax") ? Number(searchParams.get("partnerAgeMax")) : undefined;
+  const initReligion = searchParams.get("religion") || "";
+  const initMotherTongue = searchParams.get("motherTongue") || "";
 
   // Step state:
   //   0 = Basic info (profile_for / name / mobile / DOB / gender) — pre-filled from homepage if applicable
@@ -523,7 +629,7 @@ function RegisterWizard() {
   // Homepage pre-fills name/mobile but DOB/gender still need to be entered.
   const [step, setStep] = useState(0);
 
-  // Form data
+  // Form data — Gender is NEVER pre-filled; user must manually select their own gender
   const [form, setForm] = useState({
     profileFor: initProfileFor,
     name: initName,
@@ -532,17 +638,17 @@ function RegisterWizard() {
     dobDay: "",
     dobMonth: "",
     dobYear: "",
-    gender: "",
+    gender: "", // Unselected by default — user selects Male or Female manually
     password: "",
     email: initEmail, // prefilled when coming from login "Create Account"
     // Step 1
     height: "",
     physicalStatus: "",         // blank by default — user must select
     maritalStatus: "",          // blank by default — user must select
-    religion: "",
+    religion: initReligion,
     caste: "",
     subcaste: "",
-    motherTongue: "",            // blank by default — user must select
+    motherTongue: initMotherTongue,            // blank by default — user must select
     // Step 2
     education: "",
     occupation: "",
@@ -553,10 +659,12 @@ function RegisterWizard() {
     star: "",
     rasi: "",
     dhosham: "",
-    // Step 3 — Partner Preferences
-    partnerAgeMin: 22,
-    partnerAgeMax: 35,
-    partnerReligion: "",
+    // Step 3 — Partner Preferences (preserved from landing page search)
+    partnerGender: initPartnerGender,
+    partnerAgeMin: initPartnerAgeMin as number | undefined,
+    partnerAgeMax: initPartnerAgeMax as number | undefined,
+    partnerReligion: initReligion,
+    partnerMotherTongue: initMotherTongue ? [initMotherTongue] : [] as string[],
     partnerMaritalStatus: [] as string[],
     partnerState: "",
     // Step 5 — Photo / About
@@ -570,8 +678,16 @@ function RegisterWizard() {
 
   // Compatibility answers (step 4)
   const [compatAnswers, setCompatAnswers] = useState<Record<string, string>>({});
+  const [hasAutoGeneratedBio, setHasAutoGeneratedBio] = useState(false);
 
   const set = (key: string, val: string) => setForm((f) => ({ ...f, [key]: val }));
+
+  useEffect(() => {
+    if (step === 5 && !hasAutoGeneratedBio && !form.about) {
+      set("about", generateBio(form));
+      setHasAutoGeneratedBio(true);
+    }
+  }, [step, form, hasAutoGeneratedBio]);
 
   // DOB derived values
   const dobDayOptions = form.dobMonth && form.dobYear
@@ -869,9 +985,10 @@ function RegisterWizard() {
         about: form.about,
         photoUrl: form.photoUrl || undefined,
         // Partner preferences
-        partnerAgeMin: form.partnerAgeMin || 22,
-        partnerAgeMax: form.partnerAgeMax || 35,
+        partnerAgeMin: form.partnerAgeMin || undefined,
+        partnerAgeMax: form.partnerAgeMax || undefined,
         partnerReligion: form.partnerReligion && form.partnerReligion !== "Any" ? form.partnerReligion : undefined,
+        partnerMotherTongue: form.partnerMotherTongue && form.partnerMotherTongue.length > 0 ? form.partnerMotherTongue : undefined,
         partnerMaritalStatus: form.partnerMaritalStatus.length > 0 ? form.partnerMaritalStatus : undefined,
         partnerCountry: form.partnerState && form.partnerState !== "Any" ? "India" : undefined,
       });
@@ -1685,27 +1802,26 @@ function RegisterWizard() {
                   options={INDIAN_STATES}
                   placeholder="Search or select state..."
                 />
-                {form.state && CITIES_BY_STATE[form.state] ? (
-                  <FloatSearchableCombobox
-                    label="City"
-                    value={form.city}
-                    onChange={(v) => set("city", v)}
-                    options={CITIES_BY_STATE[form.state]}
-                    placeholder="Search or select city..."
-                  />
-                ) : form.state ? (
-                  <div style={{ marginBottom: "1rem" }}>
-                    <label className="form-label" htmlFor="city-input">City</label>
-                    <input
-                      id="city-input"
-                      type="text"
-                      className="form-input"
-                      placeholder="Enter your city"
-                      value={form.city}
-                      onChange={(e) => set("city", e.target.value)}
-                    />
-                  </div>
-                ) : null}
+                <FloatSearchableCombobox
+                  label="City"
+                  value={form.city}
+                  onChange={(v) => {
+                    set("city", v);
+                    // If state not selected yet, auto-select state if city belongs to a known state
+                    if (!form.state && v) {
+                      const matchedState = Object.keys(CITIES_BY_STATE).find((st) =>
+                        CITIES_BY_STATE[st].includes(v)
+                      );
+                      if (matchedState) set("state", matchedState);
+                    }
+                  }}
+                  options={
+                    form.state && CITIES_BY_STATE[form.state]
+                      ? CITIES_BY_STATE[form.state]
+                      : ALL_INDIAN_CITIES
+                  }
+                  placeholder="Search or select city..."
+                />
               </div>
 
               <div style={{ paddingTop: "0.75rem", borderTop: "1px solid var(--border-light)", marginBottom: "0.5rem" }}>
@@ -1757,10 +1873,11 @@ function RegisterWizard() {
                 <div style={{ display: "flex", gap: "0.75rem", alignItems: "center" }}>
                   <select
                     className="form-select"
-                    value={form.partnerAgeMin}
-                    onChange={e => setForm(f => ({ ...f, partnerAgeMin: Number(e.target.value) }))}
+                    value={form.partnerAgeMin ?? ""}
+                    onChange={e => setForm(f => ({ ...f, partnerAgeMin: e.target.value ? Number(e.target.value) : undefined }))}
                     style={{ flex: 1 }}
                   >
+                    <option value="">Min Age</option>
                     {Array.from({ length: 35 }, (_, i) => 18 + i).map(age => (
                       <option key={age} value={age}>{age} yrs</option>
                     ))}
@@ -1768,10 +1885,11 @@ function RegisterWizard() {
                   <span style={{ color: "var(--text-muted)", fontWeight: 600, flexShrink: 0 }}>to</span>
                   <select
                     className="form-select"
-                    value={form.partnerAgeMax}
-                    onChange={e => setForm(f => ({ ...f, partnerAgeMax: Number(e.target.value) }))}
+                    value={form.partnerAgeMax ?? ""}
+                    onChange={e => setForm(f => ({ ...f, partnerAgeMax: e.target.value ? Number(e.target.value) : undefined }))}
                     style={{ flex: 1 }}
                   >
+                    <option value="">Max Age</option>
                     {Array.from({ length: 35 }, (_, i) => 18 + i).map(age => (
                       <option key={age} value={age}>{age} yrs</option>
                     ))}
@@ -2058,11 +2176,23 @@ function RegisterWizard() {
             </div>
 
             <div className="register-card" style={{ background: "#fff", border: "1px solid var(--border-color)", borderRadius: "var(--radius-xl)", padding: "1.75rem" }}>
-              <h3 style={{ fontWeight: 700, fontSize: "1.0625rem", color: "var(--text-dark)", marginBottom: "0.875rem" }}>
-                Write a few words about yourself
-              </h3>
-              <p style={{ fontSize: "0.875rem", color: "var(--text-medium)", marginBottom: "1.25rem", lineHeight: 1.5 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.875rem" }}>
+                <h3 style={{ fontWeight: 700, fontSize: "1.0625rem", color: "var(--text-dark)", margin: 0 }}>
+                  Write a few words about yourself
+                </h3>
+                <button
+                  onClick={() => set("about", generateBio(form))}
+                  style={{ background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontSize: "0.8125rem", fontWeight: 700, display: "flex", alignItems: "center", gap: "4px" }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.34-11.14l4.5 4.5"/></svg>
+                  Regenerate
+                </button>
+              </div>
+              <p style={{ fontSize: "0.875rem", color: "var(--text-medium)", marginBottom: "0.25rem", lineHeight: 1.5 }}>
                 A good bio tells prospects about your personality, upbringing, and what you are looking for in a partner.
+              </p>
+              <p style={{ fontSize: "0.8125rem", color: "#007B55", fontWeight: 600, marginBottom: "1.25rem", display: "flex", alignItems: "center", gap: "4px" }}>
+                ✨ Here’s a bio based on your profile. You can edit it before continuing.
               </p>
 
               <textarea
@@ -2089,6 +2219,11 @@ function RegisterWizard() {
   );
 }
 
+function RegisterWizardWithKey() {
+  const searchParams = useSearchParams();
+  return <RegisterWizard key={searchParams.toString()} />;
+}
+
 export default function RegisterPage() {
   const { user } = useAuth();
   const router = useRouter();
@@ -2105,7 +2240,12 @@ export default function RegisterPage() {
         <p style={{ color: "var(--text-medium)" }}>Loading...</p>
       </div>
     }>
-      <RegisterWizard />
+      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        <div style={{ flex: 1 }}>
+          <RegisterWizardWithKey />
+        </div>
+        <CompactFooter />
+      </div>
     </Suspense>
   );
 }

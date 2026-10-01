@@ -5,11 +5,11 @@
 
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || 'https://dummy.supabase.co';
+const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || 'dummy-key-for-build';
 
-if (!serviceRoleKey) {
-  // This will only throw at server runtime, not at build time.
+if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  // This will warn at server runtime/build time.
   console.error('[supabase-admin] SUPABASE_SERVICE_ROLE_KEY is not set!');
 }
 

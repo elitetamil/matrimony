@@ -1586,6 +1586,9 @@ export function computeProfileCompletion(user: RegisteredUser | null): number {
     !!user.city,
     !!user.about,
     !!user.photoUrl,
+    !!(user.partnerAgeMin || user.partnerAgeMax || user.partnerReligion || user.partnerCaste || user.partnerEducation),
+    !!(user.fatherOccupation || user.motherOccupation || user.familyStatus || user.familyType || user.nativePlace),
+    !!(user.photos && user.photos.length > 1),
   ];
   const filled = fields.filter(Boolean).length;
   return Math.round((filled / fields.length) * 100);

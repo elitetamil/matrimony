@@ -4,7 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useAuth } from "@/context/AuthContext";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import { Bell, Heart, Eye, MessageCircle, BookmarkPlus, Star, CheckCheck, Trash2, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -367,6 +367,7 @@ function NotificationsContent() {
           )}
         </div>
       </main>
+      <CompactFooter />
     </>
   );
 }
@@ -392,7 +393,7 @@ function NotificationsGuard() {
             <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
           </div>
         </main>
-        <Footer />
+        <CompactFooter />
       </>
     );
   }

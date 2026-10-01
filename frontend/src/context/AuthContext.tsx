@@ -58,20 +58,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      const profile = await fetchProfile(data.user.id);
+    const activeProfileId = typeof window !== "undefined" ? localStorage.getItem("etm_active_profile_id") : null;
+    
+    if (activeProfileId) {
+      const profile = await fetchProfile(activeProfileId);
       setUser(profile);
-    } else if (typeof window !== "undefined") {
-      const activeProfileId = localStorage.getItem("etm_active_profile_id");
-      if (activeProfileId) {
-        const profile = await fetchProfile(activeProfileId);
+    } else {
+      const { data } = await supabase.auth.getUser();
+      if (data.user) {
+        const profile = await fetchProfile(data.user.id);
         setUser(profile);
       } else {
         setUser(null);
       }
-    } else {
-      setUser(null);
     }
     setLoading(false);
   }, [setUser]);
@@ -84,17 +83,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Initial session load
     supabase.auth.getSession().then(async ({ data }) => {
-      if (data.session?.user) {
+      const activeProfileId = typeof window !== "undefined" ? localStorage.getItem("etm_active_profile_id") : null;
+      
+      if (activeProfileId) {
+        const profile = await fetchProfile(activeProfileId);
+        setUser(profile);
+      } else if (data.session?.user) {
         const profile = await fetchProfile(data.session.user.id);
         setUser(profile);
-      } else if (typeof window !== "undefined") {
-        const activeProfileId = localStorage.getItem("etm_active_profile_id");
-        if (activeProfileId) {
-          const profile = await fetchProfile(activeProfileId);
-          setUser(profile);
-        } else {
-          setUser(null);
-        }
+      } else {
+        setUser(null);
       }
       setLoading(false);
     });
@@ -104,21 +102,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       async (event, session) => {
         // TOKEN_REFRESHED: Supabase silently refreshed the JWT in the background.
         if (event === "TOKEN_REFRESHED") return;
+        
+        const activeProfileId = typeof window !== "undefined" ? localStorage.getItem("etm_active_profile_id") : null;
 
         if (session?.user) {
+          if (activeProfileId) {
+            // Obey the manual switch account override
+            const profile = await fetchProfile(activeProfileId);
+            setUser(profile);
+            setLoading(false);
+            return;
+          }
+
           // For SIGNED_IN (new registration), retry in case profile row is being created
           const profile =
             event === "SIGNED_IN"
               ? await fetchProfileWithRetry(session.user.id, 5, 200)
               : await fetchProfile(session.user.id);
+              
           setUser(profile);
           setLoading(false);
         } else {
           // Only reset to null if there is no fallback active profile stored in localStorage
-          const activeProfileId =
-            typeof window !== "undefined"
-              ? localStorage.getItem("etm_active_profile_id")
-              : null;
           if (!activeProfileId) {
             setUser(null);
           }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import PlanTabs from "@/components/ui/PlanTabs";
 
 import { useAuth } from "@/context/AuthContext";
@@ -707,7 +707,7 @@ function InterestsContent() {
         }
       `}</style>
 
-      <main style={{ background: "#f2f2f2", height: "calc(100vh - 64px)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <main style={{ background: "#f2f2f2", minHeight: "calc(100vh - 64px)", display: "flex", flexDirection: "column" }}>
         <div
           style={{
             maxWidth: "1100px",
@@ -936,6 +936,7 @@ function InterestsContent() {
           </div>
         </div>
       </main>
+      <CompactFooter />
     </>
   );
 }
@@ -957,7 +958,7 @@ function InterestsGuard() {
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)" }}>
           Loading...
         </div>
-        <Footer />
+        <CompactFooter />
       </div>
     );
   }

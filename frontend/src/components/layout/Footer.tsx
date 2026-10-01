@@ -15,10 +15,12 @@ const QUICK_LINKS = [
 ];
 
 const ABOUT_US_LINKS = [
-  { label: "Our Story", href: "/about" },
-  { label: "Our Values", href: "/about#values" },
-  { label: "Safety & Trust", href: "/about#safety" },
+  { label: "About Us", href: "/about" },
+  { label: "Our Story", href: "/our-story" },
+  { label: "Our Values", href: "/our-values" },
+  { label: "Safety & Trust", href: "/safety-trust" },
   { label: "Success Stories", href: "/success-stories" },
+  { label: "FAQ's", href: "/faq" },
 ];
 
 const HELP_SUPPORT_LINKS = [
@@ -187,7 +189,7 @@ export default function Footer() {
 
       {/* ── Main Footer Container ─────────────────────────────────────────── */}
       <footer style={{ marginTop: "auto" }}>
-        
+
         {/* 1. TOP FOOTER SECTION — Light Cream Background */}
         <div
           style={{
@@ -200,7 +202,7 @@ export default function Footer() {
         >
           <div className="container">
             <div className="footer-top-grid">
-              
+
               {/* Left Brand Section */}
               <div style={{ display: "flex", flexDirection: "column", gap: "0.625rem" }}>
                 <Link href="/" style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}>
@@ -213,7 +215,7 @@ export default function Footer() {
                     priority
                   />
                 </Link>
-                
+
                 <p style={{ fontSize: "0.8125rem", fontStyle: "italic", color: "var(--primary, #6B1A2A)", margin: 0, fontWeight: 600 }}>
                   Connecting hearts. Building families.
                 </p>
@@ -463,10 +465,44 @@ export default function Footer() {
         </div>
 
         {/* 2. BOTTOM FOOTER BAR — Dark Maroon Background */}
-        <div style={{ background: "var(--primary-dark, #4A0F1C)", padding: "0.625rem 0", color: "#fff" }}>
-          <div className="container">
+        <div
+          style={{
+            background: "var(--primary-dark, #4A0F1C)",
+            padding: "0.625rem 0",
+            color: "#fff",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+          {/* Decorative Mandala Graphic at Bottom-Right */}
+          <div
+            style={{
+              position: "absolute",
+              right: "-20px",
+              bottom: "-35px",
+              width: "140px",
+              height: "140px",
+              pointerEvents: "none",
+              opacity: 0.28,
+              zIndex: 1,
+            }}
+          >
+            <Image
+              src="/images/Mandala.png"
+              alt=""
+              width={140}
+              height={140}
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "contain",
+              }}
+            />
+          </div>
+
+          <div className="container" style={{ position: "relative", zIndex: 2 }}>
             <div className="footer-bottom-flex">
-              
+
               {/* Copyright */}
               <p style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.75)", margin: 0 }}>
                 &copy; {new Date().getFullYear()} Elite Tamil Matrimony. All rights reserved.

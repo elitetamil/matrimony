@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import StaticPageHeader from "@/components/ui/StaticPageHeader";
+import CompactFooter from "@/components/layout/CompactFooter";
 import { Search, ChevronDown, MessageCircle, HelpCircle, ShieldCheck, CreditCard, UserCircle, Heart } from "lucide-react";
 import Link from "next/link";
 
@@ -137,81 +138,56 @@ export default function FAQPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#FAFAFA", minHeight: "100vh", paddingBottom: "5rem" }}>
-        
-        {/* ── HERO SECTION ── */}
-        <section
-          style={{
-            background: "linear-gradient(135deg, #4A101D 0%, #6B1A2A 100%)",
-            padding: "5rem 1rem",
-            textAlign: "center",
-            color: "#fff",
-            position: "relative",
-            overflow: "hidden",
-          }}
-        >
-          {/* Background decorative elements */}
-          <div style={{ position: "absolute", top: "-50px", left: "-50px", width: "200px", height: "200px", background: "rgba(255,255,255,0.05)", borderRadius: "50%", filter: "blur(20px)" }} />
-          <div style={{ position: "absolute", bottom: "-100px", right: "-50px", width: "300px", height: "300px", background: "rgba(200,151,58,0.1)", borderRadius: "50%", filter: "blur(30px)" }} />
+      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "0 0 4rem" }}>
+        <StaticPageHeader 
+          title="❓ FAQ" 
+          subtitle="Frequently Asked Questions" 
+        />
 
-          <div style={{ maxWidth: "700px", margin: "0 auto", position: "relative", zIndex: 2 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "1rem", marginBottom: "1rem" }}>
-              <BackButton style={{ color: "#fff", background: "rgba(255,255,255,0.1)" }} />
-              <h1 style={{ fontSize: "2.5rem", fontWeight: 800, margin: 0, letterSpacing: "-0.02em" }}>
-                How can we help you?
-              </h1>
-            </div>
-            <p style={{ fontSize: "1.125rem", color: "rgba(255,255,255,0.8)", marginBottom: "2.5rem" }}>
-              Search our knowledge base or browse categories below to find answers to your questions.
-            </p>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "1.5rem 1.25rem 0" }}>
 
-            {/* Search Bar */}
-            <div
+          {/* Search Bar */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              background: "#fff",
+              borderRadius: "50px",
+              padding: "0.5rem 1.5rem",
+              boxShadow: "0 4px 12px rgba(0,0,0,0.05)",
+              border: "1px solid #E5D5C5",
+              marginBottom: "2rem",
+              transition: "transform 0.2s ease, box-shadow 0.2s ease",
+            }}
+            className="faq-search-wrapper"
+          >
+            <Search size={20} color="#888" />
+            <input
+              type="text"
+              placeholder="Search for answers (e.g. 'membership', 'hide profile')..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               style={{
-                display: "flex",
-                alignItems: "center",
-                background: "#fff",
-                borderRadius: "50px",
-                padding: "0.5rem 1.5rem",
-                boxShadow: "0 10px 30px rgba(0,0,0,0.15)",
-                maxWidth: "600px",
-                margin: "0 auto",
-                transition: "transform 0.2s ease, box-shadow 0.2s ease",
+                flex: 1,
+                border: "none",
+                outline: "none",
+                padding: "0.75rem 1rem",
+                fontSize: "1rem",
+                fontFamily: "var(--font-sans)",
+                background: "transparent",
+                color: "#111",
               }}
-              className="faq-search-wrapper"
-            >
-              <Search size={20} color="#888" />
-              <input
-                type="text"
-                placeholder="Search for answers (e.g. 'membership', 'hide profile')..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                style={{
-                  flex: 1,
-                  border: "none",
-                  outline: "none",
-                  padding: "0.75rem 1rem",
-                  fontSize: "1rem",
-                  fontFamily: "var(--font-sans)",
-                  background: "transparent",
-                  color: "#111",
-                }}
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery("")}
-                  style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontWeight: 600, fontSize: "0.875rem" }}
-                >
-                  Clear
-                </button>
-              )}
-            </div>
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                style={{ background: "none", border: "none", color: "#888", cursor: "pointer", fontWeight: 600, fontSize: "0.875rem" }}
+              >
+                Clear
+              </button>
+            )}
           </div>
-        </section>
 
-        {/* ── CONTENT SECTION ── */}
-        <section style={{ maxWidth: "1000px", margin: "-2rem auto 0", padding: "0 1rem", position: "relative", zIndex: 10 }}>
-          
           <div style={{ display: "flex", gap: "2rem", alignItems: "flex-start", flexDirection: "row" }} className="faq-layout">
             
             {/* ── SIDEBAR TABS ── */}
@@ -416,7 +392,7 @@ export default function FAQPage() {
 
             </div>
           </div>
-        </section>
+        </div>
       </main>
 
       <style>{`
@@ -436,7 +412,7 @@ export default function FAQPage() {
           }
         }
       `}</style>
-      <Footer />
+      <CompactFooter />
     </>
   );
 }

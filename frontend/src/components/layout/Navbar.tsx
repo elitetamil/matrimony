@@ -101,7 +101,7 @@ const LOGGED_IN_NAV = [
 ];
 
 export default function Navbar() {
-  const { user, logout, refresh } = useAuth();
+  const { user, setUser, logout, refresh } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -141,25 +141,35 @@ export default function Navbar() {
 
     const toastId = toast.loading("Switching account...");
     try {
-      const res = await fetch("/api/otp-login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ profileId: targetAccount.id }),
-      });
-      const loginData = await res.json();
-      if (!res.ok) {
-        toast.error(loginData.error || "Failed to switch account.", { id: toastId });
+      let switchedUser: any = null;
+      try {
+        const res = await fetch("/api/otp-login", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profileId: targetAccount.id }),
+        });
+        const loginData = await res.json();
+        if (res.ok && loginData.access_token) {
+          switchedUser = await loginWithOtpSession(loginData.access_token, loginData.refresh_token);
+        }
+      } catch (e) {
+        console.warn("[SwitchAccount] API login failed, attempting fallback:", e);
+      }
+
+      if (!switchedUser) {
+        const { loginToProfile } = await import("@/lib/auth-store");
+        switchedUser = await loginToProfile(targetAccount.id);
+      }
+
+      if (switchedUser) {
+        setUser(switchedUser);
+        toast.success(`Switched to ${targetAccount.name}`, { id: toastId });
+        await refresh();
+        router.push("/");
         return;
       }
-      const result = await loginWithOtpSession(loginData.access_token, loginData.refresh_token);
-      if (!result) {
-        toast.error("Failed to switch account. Please log in again.", { id: toastId });
-        return;
-      }
-      toast.success(`Switched to ${targetAccount.name}`, { id: toastId });
-      // Refresh auth context so the new user is loaded, then navigate smoothly
-      await refresh();
-      router.push("/");
+
+      toast.error("Failed to switch account. Please try again.", { id: toastId });
     } catch {
       toast.error("Network error while switching account.", { id: toastId });
     }
@@ -935,27 +945,7 @@ export default function Navbar() {
             Login
           </Link>
 
-          {/* Sign Up — Pill solid button */}
-          <Link
-            href="/register"
-            style={{
-              background: "var(--primary)",
-              color: "#fff",
-              padding: "0.4375rem 1.25rem",
-              borderRadius: "var(--radius-full)",
-              fontWeight: 700,
-              fontSize: "0.8125rem",
-              textDecoration: "none",
-              letterSpacing: "0.02em",
-              whiteSpace: "nowrap",
-              boxShadow: "var(--shadow-sm)",
-              transition: "all 0.15s ease",
-            }}
-            onMouseEnter={(e) => (e.currentTarget.style.background = "var(--primary-dark)")}
-            onMouseLeave={(e) => (e.currentTarget.style.background = "var(--primary)")}
-          >
-            Sign Up
-          </Link>
+
 
           {/* Hamburger for mobile drawer */}
           <button
@@ -1063,22 +1053,7 @@ export default function Navbar() {
               >
                 Login
               </Link>
-              <Link
-                href="/register"
-                onClick={() => setMobileOpen(false)}
-                style={{
-                  padding: "0.625rem",
-                  background: "var(--primary)",
-                  color: "#fff",
-                  borderRadius: "var(--radius-full)",
-                  fontSize: "0.875rem",
-                  fontWeight: 700,
-                  textDecoration: "none",
-                  textAlign: "center",
-                }}
-              >
-                Sign Up
-              </Link>
+
             </div>
           </div>
         </>

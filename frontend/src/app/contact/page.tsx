@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
+import StaticPageHeader from "@/components/ui/StaticPageHeader";
 import Footer from "@/components/layout/Footer";
 import { Mail, Phone, MapPin, Clock, Send, CheckCircle2 } from "lucide-react";
 import toast from "react-hot-toast";
@@ -69,51 +70,19 @@ export default function ContactPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "1.5rem 0 4rem" }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1.25rem" }}>
-          {/* Back Button */}
-          <div style={{ marginBottom: "1rem" }}>
-            <BackButton style={{ background: "#fff", border: "1px solid #E5D5C5", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }} />
-          </div>
+      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "0 0 4rem" }}>
+        <StaticPageHeader 
+          title="✉ Contact Us" 
+          subtitle="Our team is here to help. Reach out with questions, feedback, or support requests." 
+        />
 
-          {/* Hero Banner Card — Matching Terms, Privacy, About, and Success Stories */}
-          <div
-            style={{
-              background: "#6B1A2A",
-              borderRadius: "16px",
-              padding: "2.25rem 2.5rem",
-              marginBottom: "1.75rem",
-              color: "#fff",
-              boxShadow: "0 4px 20px rgba(107, 26, 42, 0.12)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "1.125rem", marginBottom: "0.75rem" }}>
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.12)",
-                  width: "52px",
-                  height: "52px",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <Mail size={28} className="text-white" />
-              </div>
-              <h1 style={{ margin: 0, fontSize: "clamp(2rem, 4vw, 2.5rem)", fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", fontFamily: "var(--font-sans)" }}>
-                Contact Us
-              </h1>
-            </div>
-            <p style={{ margin: 0, color: "rgba(255, 255, 255, 0.9)", fontSize: "1.0625rem", lineHeight: 1.65, maxWidth: "750px", fontWeight: 400 }}>
-              Our team is here to help. Reach out with questions, feedback, or support requests.
-            </p>
-            <div style={{ marginTop: "1.25rem", display: "flex", gap: "1.5rem", flexWrap: "wrap", fontSize: "0.875rem", color: "rgba(255, 255, 255, 0.85)", fontWeight: 500 }}>
-              <span>📞 24x7 Customer Support</span>
-              <span>📧 Fast Email Response</span>
-              <span>📍 Salem Headquarters</span>
-            </div>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "1.5rem 1.25rem 0" }}>
+
+          {/* Intro Badges */}
+          <div style={{ display: "flex", gap: "1rem", flexWrap: "wrap", fontSize: "0.875rem", color: "#6B1A2A", fontWeight: 700, marginBottom: "1.5rem", background: "#fff", padding: "1rem 1.25rem", borderRadius: "12px", border: "1px solid #E5D5C5", boxShadow: "0 2px 8px rgba(0,0,0,0.03)" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>📞 24x7 Customer Support</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>📧 Fast Email Response</span>
+            <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>📍 Salem Headquarters</span>
           </div>
 
           {/* Main 2-Column Content Grid */}

@@ -4,7 +4,7 @@ import { useState, useRef, useCallback, useEffect, Suspense } from "react";
 import BackButton from "@/components/ui/BackButton";
 import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import {
   Camera, Upload, Trash2, Check, ChevronRight, ChevronDown,
   User, BookOpen, Briefcase, Users, Leaf, MapPin, FileText,
@@ -1352,7 +1352,7 @@ function EditProfileContent() {
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
 
-      <Footer />
+      <CompactFooter />
     </>
   );
 }

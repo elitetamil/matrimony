@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import { Eye, EyeOff, AlertCircle, ChevronRight, Timer } from "lucide-react";
 import toast from "react-hot-toast";
 import { loginWithPassword, getProfilesByMobile, getProfilesByEmail, loginWithOtpSession, loginToProfile, type RegisteredUser } from "@/lib/auth-store";
@@ -918,7 +918,7 @@ function LoginContent() {
           </div>
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
     </>
   );
 }

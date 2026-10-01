@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
+import StaticPageHeader from "@/components/ui/StaticPageHeader";
 import Footer from "@/components/layout/Footer";
 import { useAuth } from "@/context/AuthContext";
 import { useMembership, clearCachedPlan } from "@/hooks/useMembership";
@@ -191,7 +192,7 @@ function ActivePlanDashboard() {
   return (
     <div style={{ maxWidth: "760px", margin: "0 auto", padding: "0 1rem 4rem" }}>
 
-      {daysLeft !== null && daysLeft <= 7 && daysLeft > 0 && (
+      {daysLeft !== null && daysLeft <= 10 && daysLeft > 0 && (
         <div style={{ background: "#FFF8E1", border: "1.5px solid #FFD54F", borderRadius: "12px", padding: "0.875rem 1.25rem", marginBottom: "1.5rem", display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
           <AlertTriangle size={18} style={{ color: "#E65100", flexShrink: 0 }} />
           <p style={{ fontSize: "0.875rem", color: "#7B5800", margin: 0, fontWeight: 600, flex: 1 }}>
@@ -234,9 +235,11 @@ function ActivePlanDashboard() {
           </div>
         </div>
         <div style={{ background: "#fafafa", borderTop: "1px solid #f0f0f0", padding: "1rem 1.5rem", display: "flex", gap: "0.75rem", flexWrap: "wrap" }}>
-          <button onClick={() => { setRenewing(true); router.push(`/payment?plan=${plan}`); }} className="btn btn-primary" style={{ fontSize: "0.875rem", justifyContent: "center", flex: "1 1 140px", opacity: renewing ? 0.7 : 1 }}>
-            {renewing ? <><span style={{ animation: "spin 0.8s linear infinite", display: "inline-block" }}>⟳</span> Loading…</> : "Renew Plan"}
-          </button>
+          {daysLeft !== null && daysLeft <= 10 && (
+            <button onClick={() => { setRenewing(true); router.push(`/payment?plan=${plan}`); }} className="btn btn-primary" style={{ fontSize: "0.875rem", justifyContent: "center", flex: "1 1 140px", opacity: renewing ? 0.7 : 1 }}>
+              {renewing ? <><span style={{ animation: "spin 0.8s linear infinite", display: "inline-block" }}>⟳</span> Loading…</> : "Renew Plan"}
+            </button>
+          )}
           <button onClick={() => setShowCancelConfirm(true)} className="btn" style={{ fontSize: "0.875rem", border: "1.5px solid #e0e0e0", color: "#666", background: "#fff", flex: "1 1 140px", justifyContent: "center" }}>Cancel Plan</button>
         </div>
       </div>
@@ -401,34 +404,13 @@ export default function MembershipPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#f8f8f8", minHeight: "100vh", paddingTop: "64px" }}>
-        <section style={{
-          background: "linear-gradient(135deg, #6B1A2A 0%, #9B2D42 50%, #C8973A 100%)",
-          padding: "3rem 1rem 5.5rem",
-          textAlign: "center",
-          position: "relative",
-          overflow: "hidden",
-        }}>
-          <div style={{ position: "absolute", inset: 0, backgroundImage: "radial-gradient(circle at 20% 50%, rgba(255,255,255,0.05) 0%, transparent 50%), radial-gradient(circle at 80% 20%, rgba(200,151,58,0.12) 0%, transparent 50%)", pointerEvents: "none" }} />
-          {/* Back button — top-left */}
-          <div style={{ position: "absolute", top: "1rem", left: "1rem", zIndex: 2 }}>
-            <BackButton style={{ color: "#fff", background: "rgba(255,255,255,0.15)", border: "1px solid rgba(255,255,255,0.2)" }} />
-          </div>
-          <div style={{ position: "relative", maxWidth: "600px", margin: "0 auto" }}>
-            <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", background: "rgba(255,255,255,0.15)", borderRadius: "20px", padding: "0.25rem 0.875rem", marginBottom: "1.25rem", backdropFilter: "blur(8px)", border: "1px solid rgba(255,255,255,0.2)" }}>
-              <Crown size={13} style={{ color: "#E8C060" }} />
-              <span style={{ color: "#fff", fontSize: "0.75rem", fontWeight: 700, letterSpacing: "0.04em" }}>PREMIUM MEMBERSHIP</span>
-            </div>
-            <h1 style={{ color: "#fff", fontSize: "clamp(1.5rem, 4vw, 2.25rem)", fontWeight: 900, lineHeight: 1.2, margin: "0 0 0.875rem" }}>
-              Find Your Perfect<br />Tamil Match Faster
-            </h1>
-            <p style={{ color: "rgba(255,255,255,0.85)", fontSize: "1rem", lineHeight: 1.6, margin: 0 }}>
-              Unlock unlimited phone numbers, verified profiles, and direct messaging.
-            </p>
-          </div>
-        </section>
+      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "0 0 4rem" }}>
+        <StaticPageHeader 
+          title="Premium Membership" 
+          subtitle="Find Your Perfect Tamil Match Faster." 
+        />
 
-        <section style={{ maxWidth: "1100px", margin: "-3.5rem auto 0", padding: "0 1rem 3rem", position: "relative", zIndex: 1 }}>
+        <section style={{ maxWidth: "1100px", margin: "1.5rem auto 0", padding: "0 1rem 3rem", position: "relative", zIndex: 1 }}>
           {loading ? (
             <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
               <div style={{ width: "36px", height: "36px", border: "3px solid #e0e0e0", borderTopColor: "#6B1A2A", borderRadius: "50%", animation: "spin 0.7s linear infinite", margin: "0 auto" }} />

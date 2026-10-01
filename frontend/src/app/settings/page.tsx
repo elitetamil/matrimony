@@ -4,7 +4,7 @@ import { useState, useCallback, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import {
   Lock, Mail, Phone, Trash2, LogOut, Eye, EyeOff, Bell, BellOff,
   Shield, Users, Globe, Moon, Languages, Ruler, Heart, GraduationCap,
@@ -892,7 +892,7 @@ function SettingsContent() {
         </Modal>
       )}
 
-      <Footer />
+      <CompactFooter />
     </>
   );
 }
@@ -914,7 +914,7 @@ function SettingsGuard() {
         <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: "var(--primary)" }}>
           Loading...
         </div>
-        <Footer />
+        <CompactFooter />
       </div>
     );
   }

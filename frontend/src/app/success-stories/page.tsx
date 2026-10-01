@@ -3,7 +3,8 @@
 import { useState, useEffect } from "react";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import StaticPageHeader from "@/components/ui/StaticPageHeader";
+import CompactFooter from "@/components/layout/CompactFooter";
 import { Star, Heart, MapPin, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { supabase } from "@/lib/supabase";
@@ -88,51 +89,29 @@ export default function SuccessStoriesPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "1.5rem 0 4rem" }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1.25rem" }}>
-          {/* Back Button */}
-          <div style={{ marginBottom: "1rem" }}>
-            <BackButton style={{ background: "#fff", border: "1px solid #E5D5C5", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }} />
-          </div>
+      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "0 0 4rem" }}>
+        <StaticPageHeader
+          title="💕 Success Stories"
+          subtitle="💍 Where New Journeys Begin"
+        />
 
-          {/* Hero Banner Card */}
-          <div
-            style={{
-              background: "#6B1A2A",
-              borderRadius: "16px",
-              padding: "2.25rem 2.5rem",
-              marginBottom: "1.75rem",
-              color: "#fff",
-              boxShadow: "0 4px 20px rgba(107, 26, 42, 0.12)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "1.125rem", marginBottom: "0.75rem" }}>
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.12)",
-                  width: "52px",
-                  height: "52px",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <Heart size={28} className="fill-white text-white" />
-              </div>
-              <h1 style={{ margin: 0, fontSize: "clamp(2rem, 4vw, 2.5rem)", fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", fontFamily: "var(--font-sans)" }}>
-                Success Stories
-              </h1>
-            </div>
-            <p style={{ margin: 0, color: "rgba(255, 255, 255, 0.9)", fontSize: "1.0625rem", lineHeight: 1.65, maxWidth: "750px", fontWeight: 400 }}>
-              Real Couples. Real Happiness. Inspiring love stories from members who found their soulmates on Elite Tamil Matrimony.
-            </p>
-            <div style={{ marginTop: "1.25rem", display: "flex", gap: "1.5rem", flexWrap: "wrap", fontSize: "0.875rem", color: "rgba(255, 255, 255, 0.85)", fontWeight: 500 }}>
-              <span>💖 500+ Happy Unions</span>
-              <span>✨ Verified Member Stories</span>
-              <span>💍 Global Tamil Couples</span>
-            </div>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "1.5rem 1.25rem 0" }}>
+
+          {/* Introductory Content Card */}
+          <div style={{ marginBottom: "1.5rem" }}>
+            <section
+              style={{
+                background: "#fff",
+                border: "1px solid #E5D5C5",
+                borderRadius: "14px",
+                padding: "1.75rem 2rem",
+                boxShadow: "0 2px 8px rgba(0,0,0,0.03)",
+              }}
+            >
+              <p style={{ fontSize: "0.9375rem", color: "#333", lineHeight: 1.75, marginBottom: "0" }}>
+                Every successful relationship begins with a meaningful connection. At Elite Tamil Matrimony, we are proud to be part of the journey that brings two individuals and their families together. From the first profile view to the first conversation, every connection has its own story. Some begin with shared interests, some through family introductions, and others simply with a meaningful conversation.
+              </p>
+            </section>
           </div>
 
           {/* Stories Grid / Content Area */}
@@ -159,25 +138,23 @@ export default function SuccessStoriesPage() {
                     key={story.id}
                     className="story-card-hover"
                     style={{
-                      background: "#fff",
-                      border: "1px solid #E5D5C5",
-                      borderRadius: "16px",
-                      overflow: "hidden",
-                      boxShadow: "0 4px 16px rgba(0, 0, 0, 0.04)",
+                      background: "transparent",
+                      borderRadius: "32px",
                       display: "flex",
                       flexDirection: "column",
-                      height: "100%",
+                      position: "relative",
                     }}
                   >
-                    {/* Photo Frame with Fixed Size & Aspect Ratio matching Reference Image */}
+                    {/* Photo Frame with Editorial Style */}
                     <div
                       style={{
                         position: "relative",
                         width: "100%",
-                        height: "240px",
+                        height: "210px",
                         overflow: "hidden",
-                        background: "#2A0A10",
+                        background: "#EAE0D5",
                         flexShrink: 0,
+                        borderRadius: "20px 20px 0 0",
                       }}
                     >
                       {story.photo_url ? (
@@ -187,8 +164,8 @@ export default function SuccessStoriesPage() {
                           style={{
                             width: "100%",
                             height: "100%",
-                            objectFit: "contain",
-                            objectPosition: "center",
+                            objectFit: "cover",
+                            objectPosition: "top center",
                             display: "block",
                           }}
                         />
@@ -207,54 +184,54 @@ export default function SuccessStoriesPage() {
                         </div>
                       )}
 
-                      {/* Dark Gradient Overlay with Couple's Name at bottom-left */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          inset: 0,
-                          background: "linear-gradient(180deg, rgba(0,0,0,0) 30%, rgba(0,0,0,0.85) 100%)",
-                          display: "flex",
-                          alignItems: "flex-end",
-                          padding: "1.125rem 1.25rem",
-                        }}
-                      >
-                        <h3
-                          style={{
-                            margin: 0,
-                            color: "#ffffff",
-                            fontWeight: 700,
-                            fontSize: "1.0625rem",
-                            fontFamily: "var(--font-sans)",
-                            lineHeight: 1.3,
-                            textShadow: "0 2px 4px rgba(0,0,0,0.5)",
-                          }}
-                        >
-                          {story.name}
-                        </h3>
+                      {/* Badge overlay on image */}
+                      <div style={{ position: "absolute", top: "20px", right: "20px", background: "rgba(255,255,255,0.9)", backdropFilter: "blur(4px)", padding: "6px 12px", borderRadius: "20px", fontSize: "0.6875rem", fontWeight: 700, color: "#6B1A2A", display: "flex", alignItems: "center", gap: "4px", boxShadow: "0 4px 12px rgba(0,0,0,0.08)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                        ✨ Success Story
                       </div>
                     </div>
 
                     {/* Card Content Body */}
                     <div
                       style={{
-                        padding: "1.25rem",
+                        padding: "1.75rem 2rem",
                         flex: 1,
                         display: "flex",
                         flexDirection: "column",
-                        justifyContent: "space-between",
                         background: "#fff",
+                        zIndex: 1,
+                        borderRadius: "0 0 24px 24px",
+                        boxShadow: "0 8px 30px rgba(107, 26, 42, 0.06)",
+                        border: "1px solid #F4EBE2",
+                        borderTop: "none",
                       }}
                     >
+                      <h3
+                        style={{
+                          margin: "0 0 0.375rem",
+                          color: "#6B1A2A",
+                          fontWeight: 800,
+                          fontSize: "1.1875rem",
+                          fontFamily: "var(--font-sans)",
+                          lineHeight: 1.3,
+                        }}
+                      >
+                        {story.name}
+                      </h3>
+
+                      <div style={{ fontSize: "0.8125rem", color: "#D4A840", fontWeight: 700, marginBottom: "1rem", letterSpacing: "0.03em" }}>
+                        A beautiful beginning...
+                      </div>
+
                       <p
                         style={{
                           fontSize: "0.9375rem",
-                          color: "#222222",
-                          lineHeight: 1.6,
-                          margin: "0 0 0.75rem",
+                          color: "#444",
+                          lineHeight: 1.7,
+                          margin: "0 0 1.25rem",
                           fontFamily: "var(--font-sans)",
                           ...(expandedIds.has(story.id) ? {} : {
                             display: "-webkit-box",
-                            WebkitLineClamp: 3,
+                            WebkitLineClamp: 4,
                             WebkitBoxOrient: "vertical",
                             overflow: "hidden",
                           }),
@@ -262,54 +239,38 @@ export default function SuccessStoriesPage() {
                       >
                         {story.story}
                       </p>
-                      <button
-                        onClick={() => toggleExpand(story.id)}
-                        style={{
-                          background: "none", border: "none", padding: 0,
-                          color: "#6B1A2A", fontWeight: 700, fontSize: "0.8125rem",
-                          cursor: "pointer", fontFamily: "var(--font-sans)",
-                          marginBottom: "0.5rem",
-                          textDecoration: "underline",
-                        }}
-                      >
-                        {expandedIds.has(story.id) ? "Show less" : "Read more..."}
-                      </button>
 
-                      {/* Location & Rating Stars */}
-                      <div
-                        style={{
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "space-between",
-                          borderTop: "1px solid #F4EBE2",
-                          paddingTop: "0.875rem",
-                          marginTop: "auto",
-                        }}
-                      >
-                        {story.city ? (
-                          <span
-                            style={{
-                              fontSize: "0.78125rem",
-                              color: "#666",
-                              display: "flex",
-                              alignItems: "center",
-                              gap: "4px",
-                              fontWeight: 500,
-                            }}
-                          >
-                            <MapPin size={13} style={{ color: "#6B1A2A" }} />
-                            {story.city}
-                          </span>
-                        ) : (
-                          <span style={{ fontSize: "0.78125rem", color: "#666", fontWeight: 500 }}>
-                            Verified Couple
-                          </span>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: "auto", paddingTop: "0.5rem" }}>
+                        <button
+                          onClick={() => toggleExpand(story.id)}
+                          style={{
+                            background: "none", border: "none", padding: 0,
+                            color: "#6B1A2A", fontWeight: 700, fontSize: "0.875rem",
+                            cursor: "pointer", fontFamily: "var(--font-sans)",
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "4px",
+                            textDecoration: "none",
+                          }}
+                        >
+                          {expandedIds.has(story.id) ? "Show less" : "Read Story →"}
+                        </button>
+
+                        {(story.city || story.married) && (
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                            {story.city && (
+                              <span style={{ fontSize: "0.75rem", color: "#888", display: "flex", alignItems: "center", gap: "4px", fontWeight: 500 }}>
+                                <MapPin size={12} style={{ color: "#D4A840" }} />
+                                {story.city}
+                              </span>
+                            )}
+                            {story.married && (
+                              <span style={{ fontSize: "0.6875rem", color: "#999", fontWeight: 500, fontStyle: "italic", marginTop: "2px" }}>
+                                {story.married}
+                              </span>
+                            )}
+                          </div>
                         )}
-                        <div style={{ display: "flex", gap: "2px" }}>
-                          {[1, 2, 3, 4, 5].map((n) => (
-                            <Star key={n} size={13} style={{ color: "#F59E0B", fill: "#F59E0B" }} />
-                          ))}
-                        </div>
                       </div>
                     </div>
                   </div>
@@ -329,13 +290,10 @@ export default function SuccessStoriesPage() {
               }}
             >
               <h3 style={{ fontSize: "1.25rem", fontWeight: 700, color: "#6B1A2A", margin: "0 0 0.5rem" }}>
-                Write Your Own Love Story
+                Your story could be our next beautiful success story.
               </h3>
-              <p style={{ fontSize: "0.9375rem", color: "#555", margin: "0 0 1.25rem" }}>
-                Find someone who shares your values, culture, and life goals.
-              </p>
               <Link
-                href="/register"
+                href="/contact"
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
@@ -348,41 +306,48 @@ export default function SuccessStoriesPage() {
                   fontSize: "0.875rem",
                   textDecoration: "none",
                   boxShadow: "0 2px 8px rgba(107, 26, 42, 0.2)",
+                  marginTop: "1.25rem",
                 }}
               >
-                Register Free <ArrowRight size={16} />
+                Share Your Story <ArrowRight size={16} />
               </Link>
             </section>
           </div>
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
 
       <style>{`
         .success-stories-grid {
           display: grid;
           grid-template-columns: repeat(3, 1fr);
           gap: 1.5rem;
+          padding-bottom: 2rem;
         }
-        @media (max-width: 900px) {
+        .story-card-hover {
+          transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+          border-radius: 20px;
+          background: #fff;
+        }
+        @media (min-width: 900px) {
+          .success-stories-grid > div:hover {
+            transform: translateY(-6px);
+          }
+        }
+        @media (max-width: 899px) and (min-width: 600px) {
           .success-stories-grid {
             grid-template-columns: repeat(2, 1fr);
             gap: 1.25rem;
           }
         }
-        @media (max-width: 600px) {
+        @media (max-width: 599px) {
           .success-stories-grid {
             grid-template-columns: 1fr;
             gap: 1.25rem;
+            padding-bottom: 0;
           }
-        }
-        .story-card-hover {
-          transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-        @media (hover: hover) {
-          .story-card-hover:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 10px 28px rgba(107, 26, 42, 0.12) !important;
+          .success-stories-grid > div:hover {
+            transform: translateY(-3px);
           }
         }
       `}</style>

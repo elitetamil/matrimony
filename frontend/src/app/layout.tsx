@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Lato } from "next/font/google";
+import { Plus_Jakarta_Sans, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import { Toaster } from "react-hot-toast";
 import { AuthProvider } from "@/context/AuthContext";
@@ -8,10 +8,15 @@ import CookieConsent from "@/components/ui/CookieConsent";
 import PageResilience from "@/components/ui/PageResilience";
 import ScrollToTop from "@/components/ui/ScrollToTop";
 
-const lato = Lato({
-  variable: "--font-lato",
+const plusJakartaSans = Plus_Jakarta_Sans({
+  variable: "--font-plus-jakarta-sans",
   subsets: ["latin"],
-  weight: ["300", "400", "700"],
+  display: "swap",
+});
+
+const playfairDisplay = Playfair_Display({
+  variable: "--font-playfair-display",
+  subsets: ["latin"],
   display: "swap",
 });
 
@@ -68,7 +73,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={lato.variable} data-scroll-behavior="smooth">
+    <html lang="en" className={`${plusJakartaSans.variable} ${playfairDisplay.variable}`} data-scroll-behavior="smooth">
       <head>
         {/* Favicon — Elite Tamil Matrimony transparent logo */}
         <link rel="icon" type="image/png" href="/logo-transparent.png" />
@@ -82,7 +87,7 @@ export default function RootLayout({
       </head>
       <body
         className="min-h-screen flex flex-col"
-        style={{ fontFamily: "var(--font-lato, 'Lato', sans-serif)" }}
+        style={{ fontFamily: "var(--font-sans)" }}
       >
         <AuthProvider>
           <ScrollToTop />
@@ -94,7 +99,7 @@ export default function RootLayout({
             position="top-center"
             toastOptions={{
               style: {
-                fontFamily: "var(--font-lato, 'Lato', sans-serif)",
+                fontFamily: "var(--font-sans)",
                 borderRadius: "4px",
                 border: "1px solid #DDDDDD",
                 fontSize: "14px",

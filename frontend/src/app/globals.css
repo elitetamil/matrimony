@@ -1,9 +1,10 @@
-@import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,500;0,600;0,700;1,500;1,600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ============================================================
    ELITE TAMIL MATRIMONY — Mobile-First PWA Design System
-   Font: Lato | Colors: Primary #6B1A2A (maroon) + Cream BG
+   Fonts: Plus Jakarta Sans (Primary/UI) & Playfair Display (Headings)
+   Colors: Primary #6B1A2A (maroon) + Cream BG + Gold Accents
    ============================================================ */
 
 /* ---- CSS Custom Properties ---- */
@@ -107,10 +108,11 @@
   --radius-2xl: 16px;
   --radius-full: 9999px;
 
-  /* ── FONT ── */
-  --font-sans: 'Lato', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-serif: 'Lato', sans-serif;
-  --font-lato: 'Lato', sans-serif;
+  /* ── FONT SYSTEM ── */
+  --font-sans: var(--font-plus-jakarta-sans, 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif);
+  --font-serif: var(--font-playfair-display, 'Playfair Display', Georgia, serif);
+  --font-heading: var(--font-playfair-display, 'Playfair Display', Georgia, serif);
+  --font-lato: var(--font-sans);
 
   /* ── BOTTOM NAV HEIGHT (PWA) ── */
   --bottom-nav-height: 60px;
@@ -149,7 +151,7 @@ body {
   font-size: 15px;
   font-weight: 400;
   letter-spacing: 0.01em;
-  overflow-x: hidden;
+  overflow-x: clip;
   /* Offset fixed header so content isn't hidden beneath it */
   padding-top: var(--navbar-height);
   /* Safe area for PWA */
@@ -160,7 +162,7 @@ body {
 html,
 body {
   max-width: 100vw;
-  overflow-x: hidden;
+  overflow-x: clip;
 }
 
 img {
@@ -173,16 +175,24 @@ img {
    ============================================================ */
 
 .font-serif {
-  font-family: var(--font-sans) !important;
+  font-family: var(--font-serif) !important;
 }
 
 .font-sans {
   font-family: var(--font-sans) !important;
 }
 
+.font-heading, .heading-playfair {
+  font-family: var(--font-heading) !important;
+}
+
+h1, h2, .section-title, .text-display {
+  font-family: var(--font-heading);
+}
+
 .text-display {
-  font-family: var(--font-sans);
-  font-size: clamp(1.5rem, 5vw, 2.5rem);
+  font-family: var(--font-heading);
+  font-size: clamp(1.75rem, 5vw, 2.75rem);
   font-weight: 700;
   line-height: 1.2;
   color: var(--text-dark);

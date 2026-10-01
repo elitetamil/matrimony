@@ -4,6 +4,7 @@ import { Suspense, useState, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
+import CompactFooter from "@/components/layout/CompactFooter";
 import { useAuth } from "@/context/AuthContext";
 import { RELIGIONS, MOTHER_TONGUES, MARITAL_STATUS, PHYSICAL_STATUS, EDUCATION_LEVELS, OCCUPATIONS, INCOME_RANGES, COUNTRIES, INDIAN_STATES, EATING_HABITS, STARS, RAASI_LIST, DHOSHAM_OPTIONS, RELIGION_TO_CASTES, CASTE_TO_SUBCASTE } from '@/data/matrimony-data';
 import { Search, SlidersHorizontal, X, Grid3X3, List, Heart, Bookmark, MessageCircle, Phone } from "lucide-react";
@@ -767,6 +768,7 @@ function SearchContent() {
           </div>
         </div>
       </main>
+      <CompactFooter />
     </>
   );
 }

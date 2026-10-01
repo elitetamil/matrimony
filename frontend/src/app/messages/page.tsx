@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
+import CompactFooter from "@/components/layout/CompactFooter";
 import {
   Search, MoreVertical,
   Send, CheckCheck, Check, Crown, MessageCircle, ArrowLeft, UserCircle, Flag,
@@ -342,7 +343,7 @@ function MessagesContent() {
     <>
       <Navbar />
 
-      <main style={{ background: "#f2f2f2", height: "calc(100vh - 64px)", overflow: "hidden", display: "flex", flexDirection: "column" }}>
+      <main style={{ background: "#f2f2f2", minHeight: "calc(100vh - 64px)", display: "flex", flexDirection: "column" }}>
         <div
           style={{
             maxWidth: "1100px",
@@ -648,6 +649,7 @@ function MessagesContent() {
             </div>
           </div>
       </main>
+      <CompactFooter />
 
       <style>{`
         @media (min-width: 768px) {

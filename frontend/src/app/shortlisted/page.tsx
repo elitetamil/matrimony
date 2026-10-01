@@ -2,7 +2,7 @@
 
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import ProfileCard from "@/components/ui/ProfileCard";
 import { BookmarkPlus, Trash2, Heart } from "lucide-react";
 import Link from "next/link";
@@ -69,7 +69,7 @@ function ShortlistedContent() {
         <main style={{ background: "var(--cream-bg)", minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
           <div>Loading...</div>
         </main>
-        <Footer />
+        <CompactFooter />
       </>
     );
   }
@@ -177,7 +177,7 @@ function ShortlistedContent() {
           )}
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
     </>
   );
 }
@@ -199,7 +199,7 @@ function ShortlistedGuard() {
         <main style={{ background: "var(--cream-bg)", minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center" }}>
           <div>Loading...</div>
         </main>
-        <Footer />
+        <CompactFooter />
       </>
     );
   }

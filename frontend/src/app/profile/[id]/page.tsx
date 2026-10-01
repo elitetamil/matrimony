@@ -3,7 +3,7 @@
 import { use, useState, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import { MOCK_PROFILES, MOCK_GROOM_PROFILES } from "@/data/mock-profiles";
 import { Heart, BookmarkPlus, MessageCircle, Phone, Share2, Flag, ArrowLeft, ChevronRight, Edit2, CheckCircle, Camera, UserCircle, Briefcase, Star, FileText, MapPin, Crown, Lock } from "lucide-react";
 import toast from "react-hot-toast";
@@ -357,7 +357,7 @@ function OwnProfileFallback({ id }: { id: string }) {
           )}
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
     </>
   );
 }
@@ -678,7 +678,7 @@ function ProfileDetailPage({
         <main style={{ background: "var(--bg-page)", minHeight: "100vh" }}>
           <ProfileViewSkeleton />
         </main>
-        <Footer />
+        <CompactFooter />
       </>
     );
   }
@@ -715,7 +715,7 @@ function ProfileDetailPage({
             </button>
           </div>
         </main>
-        <Footer />
+        <CompactFooter />
       </>
     );
   }
@@ -1663,7 +1663,7 @@ function ProfileDetailPage({
           </div>
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
     </>
   );
 }

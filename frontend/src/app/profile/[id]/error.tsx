@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
 import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 
 export default function ProfileError({
   error,
@@ -44,7 +44,7 @@ export default function ProfileError({
           </button>
         </div>
       </div>
-      <Footer />
+      <CompactFooter />
     </div>
   );
 }

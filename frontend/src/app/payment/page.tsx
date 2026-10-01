@@ -4,7 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import {
   Check, Lock, Shield, Star, Award, Crown, ChevronLeft,
   AlertCircle, X, Mail, Sparkles
@@ -608,7 +608,7 @@ export default function PaymentPage() {
       <Suspense fallback={<div style={{ minHeight: "60vh", display: "flex", alignItems: "center", justifyContent: "center" }}><p style={{ color: "var(--text-medium)" }}>Loading...</p></div>}>
         <PaymentPageInner />
       </Suspense>
-      <Footer />
+      <CompactFooter />
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
         @media (max-width: 768px) { .payment-grid { grid-template-columns: 1fr !important; } }

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import { supabase } from "@/lib/supabase";
 
 export default function ForgotPasswordPage() {
@@ -293,7 +293,7 @@ export default function ForgotPasswordPage() {
           </div>
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>

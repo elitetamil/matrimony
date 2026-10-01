@@ -4,7 +4,8 @@ import { useEffect } from "react";
 import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
-import Footer from "@/components/layout/Footer";
+import StaticPageHeader from "@/components/ui/StaticPageHeader";
+import CompactFooter from "@/components/layout/CompactFooter";
 
 const LAST_UPDATED = "September 5, 2026";
 const EFFECTIVE_DATE = "September 5, 2026";
@@ -446,53 +447,13 @@ export default function PrivacyPolicyPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "1.5rem 0 4rem", overflowX: "hidden" }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1.25rem", boxSizing: "border-box" }}>
-          {/* Back Button */}
-          <div style={{ marginBottom: "1rem" }}>
-            <BackButton style={{ background: "#fff", border: "1px solid #E5D5C5", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }} />
-          </div>
+      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "0 0 4rem" }}>
+        <StaticPageHeader 
+          title="Privacy Policy" 
+          subtitle="Your privacy matters to us. This policy explains how Elite Tamil Matrimony collects, uses, and protects your personal information." 
+        />
 
-          {/* Hero Banner Card — Matching Reference Image */}
-          <div
-            style={{
-              background: "#6B1A2A",
-              borderRadius: "16px",
-              padding: "2.25rem 2.5rem",
-              marginBottom: "1.75rem",
-              color: "#fff",
-              boxShadow: "0 4px 20px rgba(107, 26, 42, 0.12)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "1.125rem", marginBottom: "0.75rem" }}>
-              <div style={{
-                background: "rgba(255, 255, 255, 0.12)",
-                width: "52px",
-                height: "52px",
-                borderRadius: "12px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
-              }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                  <polyline points="9 12 11 14 15 10"/>
-                </svg>
-              </div>
-              <h1 style={{ margin: 0, fontSize: "clamp(2rem, 4vw, 2.5rem)", fontWeight: 800, letterSpacing: "-0.02em", color: "#fff", fontFamily: "var(--font-sans)" }}>
-                Privacy Policy
-              </h1>
-            </div>
-            <p style={{ margin: 0, color: "rgba(255, 255, 255, 0.9)", fontSize: "1.0625rem", lineHeight: 1.65, maxWidth: "750px", fontWeight: 400 }}>
-              Your privacy matters to us. This policy explains how Elite Tamil Matrimony collects, uses, and protects your personal information.
-            </p>
-            <div style={{ marginTop: "1.25rem", display: "flex", gap: "1.5rem", flexWrap: "wrap", fontSize: "0.875rem", color: "rgba(255, 255, 255, 0.85)", fontWeight: 500 }}>
-              <span>🗓️ Last Updated: {LAST_UPDATED}</span>
-              <span>✅ Effective Date: {EFFECTIVE_DATE}</span>
-            </div>
-          </div>
-
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "1.5rem 1.25rem 0" }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: "1.5rem" }}>
             {/* Table of Contents */}
             <nav
@@ -571,7 +532,7 @@ export default function PrivacyPolicyPage() {
           </div>
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
 
       <style>{`
         .policy-content p {

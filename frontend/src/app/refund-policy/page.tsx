@@ -1,7 +1,8 @@
 import Navbar from "@/components/layout/Navbar";
-import Footer from "@/components/layout/Footer";
+import CompactFooter from "@/components/layout/CompactFooter";
 import Link from "next/link";
 import BackButton from "@/components/ui/BackButton";
+import StaticPageHeader from "@/components/ui/StaticPageHeader";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
@@ -14,51 +15,13 @@ export default function RefundPolicyPage() {
   return (
     <>
       <Navbar />
-      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "1.5rem 0 4rem" }}>
-        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1.25rem" }}>
-          {/* Back Button */}
-          <div style={{ marginBottom: "1rem" }}>
-            <BackButton style={{ background: "#fff", border: "1px solid #E5D5C5", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }} />
-          </div>
+      <main style={{ background: "#FAF4F0", minHeight: "calc(100vh - 120px)", padding: "0 0 4rem" }}>
+        <StaticPageHeader 
+          title="Refund & Cancellation Policy" 
+          subtitle="Information regarding subscription cancellations, refund eligibility, and payment processing rules." 
+        />
 
-          {/* Hero Header */}
-          <div
-            style={{
-              background: "#6B1A2A",
-              borderRadius: "16px",
-              padding: "2.25rem 2.5rem",
-              marginBottom: "1.75rem",
-              color: "#fff",
-              boxShadow: "0 4px 20px rgba(107, 26, 42, 0.12)",
-            }}
-          >
-            <div style={{ display: "flex", alignItems: "center", gap: "1.125rem", marginBottom: "0.75rem" }}>
-              <div
-                style={{
-                  background: "rgba(255, 255, 255, 0.12)",
-                  width: "52px",
-                  height: "52px",
-                  borderRadius: "12px",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  flexShrink: 0,
-                }}
-              >
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="2" y="4" width="20" height="16" rx="2" />
-                  <line x1="6" y1="12" x2="10" y2="12" />
-                  <line x1="14" y1="12" x2="18" y2="12" />
-                </svg>
-              </div>
-              <h1 style={{ margin: 0, fontSize: "clamp(1.75rem, 4vw, 2.25rem)", fontWeight: 800, color: "#fff" }}>
-                Refund &amp; Cancellation Policy
-              </h1>
-            </div>
-            <p style={{ margin: 0, color: "rgba(255, 255, 255, 0.9)", fontSize: "1rem", lineHeight: 1.6, maxWidth: "750px" }}>
-              Information regarding subscription cancellations, refund eligibility, and payment processing rules.
-            </p>
-          </div>
+        <div style={{ maxWidth: "1100px", margin: "0 auto", padding: "1.5rem 1.25rem 0" }}>
 
           {/* Policy Content Card */}
           <div
@@ -131,7 +94,7 @@ export default function RefundPolicyPage() {
           </div>
         </div>
       </main>
-      <Footer />
+      <CompactFooter />
     </>
   );
 }
