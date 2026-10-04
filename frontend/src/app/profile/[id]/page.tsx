@@ -5,7 +5,7 @@ import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import CompactFooter from "@/components/layout/CompactFooter";
 import { MOCK_PROFILES, MOCK_GROOM_PROFILES } from "@/data/mock-profiles";
-import { Heart, BookmarkPlus, MessageCircle, Phone, Share2, Flag, ArrowLeft, ChevronRight, Edit2, CheckCircle, Camera, UserCircle, Briefcase, Star, FileText, MapPin, Crown, Lock } from "lucide-react";
+import { Heart, BookmarkPlus, MessageCircle, Phone, ArrowLeft, ChevronRight, Edit2, CheckCircle, Camera, UserCircle, Briefcase, Star, FileText, MapPin, Crown, Lock } from "lucide-react";
 import toast from "react-hot-toast";
 import { getUserById, sendInterestWithNotification, getInterestStatus, shortlistProfileWithNotification, recordProfileViewWithNotification } from "@/lib/auth-store";
 import { useAuth } from "@/context/AuthContext";
@@ -389,6 +389,7 @@ function ProfileDetailPage({
   const fromPage = searchParams?.get("from"); // e.g. "daily-recs"
   const [backLabel, setBackLabel] = useState<string>("Back");
   const [fallbackHref, setFallbackHref] = useState<string>("/matches");
+  const [activeProfileTab, setActiveProfileTab] = useState("Profile Details");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -861,7 +862,8 @@ function ProfileDetailPage({
 
           <div className="profile-layout-row" style={{ display: "flex", gap: "1.25rem", alignItems: "flex-start" }}>
             {/* ── LEFT SIDEBAR — desktop only ── */}
-            <aside
+            {isOwnProfile && (
+<aside
               className="profile-sidebar"
               style={{
                 width: "200px",
@@ -949,6 +951,7 @@ function ProfileDetailPage({
                 </button>
               ))}
             </aside>
+)}
 
             {/* ── MAIN CONTENT ── */}
             <div className="profile-center-col" style={{ flex: 1, minWidth: 0 }}>
@@ -1033,80 +1036,160 @@ function ProfileDetailPage({
                       </a>
                     </div>
                   </div>
-                </div>
-              ) : (
-                <div style={{ background: "#fff", borderRadius: "var(--radius-xl)", border: "1px solid var(--border-color)", overflow: "hidden", boxShadow: "var(--shadow-sm)", marginBottom: "1rem" }}>
-                  <div style={{ background: "linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%)", padding: "0.75rem 1.125rem", display: "flex", alignItems: "center" }}>
-                    <span style={{ color: "white", fontWeight: 700, fontSize: "1rem" }}>Profile Details</span>
-                  </div>
-                  <div style={{ display: "flex", flexWrap: "wrap", padding: "1.5rem", gap: "1.5rem" }}>
-                    {/* Photo */}
-                    <div style={{ flexShrink: 0, width: "140px", margin: "0 auto" }}>
-                      <div style={{ width: "140px", height: "175px", borderRadius: "var(--radius-lg)", overflow: "hidden", background: "#F8F0F0", border: "2px solid var(--border-light)", position: "relative" }}>
-                        {photo ? (
-                          <img 
-                            src={photo} 
-                            alt={profile.name} 
-                            onClick={() => { setLightboxPhoto(photo); setLightboxIndex(0); }}
-                            style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", cursor: "pointer" }} 
-                          />
-                        ) : (
-                          <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--primary-light)" }}>
-                             <UserCircle size={48} color="var(--primary)" opacity={0.5} />
-                          </div>
-                        )}
-                        {profile.isOnline && (
-                          <span style={{ position: "absolute", bottom: "8px", right: "8px", width: "12px", height: "12px", borderRadius: "50%", background: "#22C55E", border: "2px solid #fff" }} />
-                        )}
-                      </div>
-                    </div>
-                    {/* Info */}
-                    <div style={{ flex: 1, minWidth: "250px", display: "flex", flexDirection: "column", gap: "0.5rem" }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", justifyContent: "space-between", flexWrap: "wrap" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
-                          <h1 style={{ fontSize: "1.5rem", fontWeight: 700, color: "var(--text-dark)", margin: 0 }}>{profile.name}</h1>
-                          {profile.isVerified && <CheckCircle size={18} fill="var(--success)" stroke="white" strokeWidth={2.5} />}
+                </div>              ) : (
+                <div style={{ display: "flex", flexDirection: "column", gap: "1rem", width: "100%" }}>
+                  {/* HEADER SECTION (Left & Right Cards) */}
+                  <div style={{ display: "flex", gap: "1.5rem", alignItems: "stretch", flexWrap: "wrap" }}>
+                    
+                    {/* LEFT HEADER: Profile Info */}
+                    <div style={{ flex: "2", minWidth: "300px", background: "#fff", borderRadius: "var(--radius-xl)", border: "1px solid var(--border-color)", padding: "1.5rem", display: "flex", gap: "1.5rem", boxShadow: "var(--shadow-sm)" }}>
+                      {/* Photo */}
+                      <div style={{ flexShrink: 0, width: "140px" }}>
+                        <div style={{ width: "140px", height: "175px", borderRadius: "var(--radius-lg)", overflow: "hidden", background: "#F8F0F0", border: "1px solid var(--border-light)", position: "relative" }}>
+                          {photo ? (
+                            <img src={photo} alt={profile.name} onClick={() => { setLightboxPhoto(photo); setLightboxIndex(0); }} style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "top", cursor: "pointer" }} />
+                          ) : (
+                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--primary-light)" }}>
+                               <UserCircle size={48} color="var(--primary)" opacity={0.5} />
+                            </div>
+                          )}
                         </div>
-                        {/* Right side actions */}
-                        <div style={{ display: "flex", gap: "0.5rem" }}>
-                          <button onClick={() => { navigator.clipboard?.writeText(window.location.href); toast.success("Profile link copied"); }} style={{ background: "none", border: "none", cursor: "pointer", color: "#888", display: "flex", alignItems: "center", gap: "4px", fontSize: "0.8125rem" }}><Share2 size={14} /> Share</button>
-                          <button onClick={() => toast("Report submitted")} style={{ background: "none", border: "none", cursor: "pointer", color: "#888", display: "flex", alignItems: "center", gap: "4px", fontSize: "0.8125rem" }}><Flag size={14} /> Report</button>
-                        </div>
-                      </div>
-                      <div style={{ fontSize: "0.875rem", color: "var(--text-secondary)" }}>
-                        Profile created for {profile.gender === "female" ? "Friend" : "Son"}
-                      </div>
-                      <div style={{ display: "grid", gap: "0.5rem", fontSize: "0.9375rem", color: "var(--text-medium)", marginTop: "0.5rem" }}>
-                        <div><strong style={{ color: "var(--text-dark)" }}>{profileAge ? `${profileAge} Yrs` : "—"}</strong>{profile.height ? `, ${profile.height}` : ""}</div>
-                        {profile.religion || profile.community ? (
-                          <div>{[profile.religion, profile.community].filter(Boolean).join(", ")}</div>
-                        ) : null}
-                        {profile.location && <div>{profile.location}</div>}
-                        {profile.education || profile.occupation ? (
-                          <div>{[profile.education, profile.occupation && profile.occupation !== "Not Working" ? profile.occupation : (profile.occupation === "Not Working" ? "Not working" : null)].filter(Boolean).join(", ")}</div>
-                        ) : null}
                       </div>
                       
-                      {/* Interaction Buttons */}
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", marginTop: "1rem" }}>
-                        <button 
-                          onClick={handleSendInterest}
-                          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0.5rem 1rem", background: interested ? "var(--primary)" : "#fff", border: "1.5px solid var(--primary)", borderRadius: "var(--radius-full)", color: interested ? "#fff" : "var(--primary)", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer", whiteSpace: "nowrap" }}>
-                          <Heart size={14} fill={interested ? "white" : "none"} /> {interested ? "Interest Sent" : "Send Interest"}
+                      {/* Info & Buttons */}
+                      <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", flex: 1 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                          <h1 style={{ fontSize: "1.375rem", fontWeight: 700, color: "var(--text-dark)", margin: 0 }}>{profile.name}</h1>
+                          {profile.isVerified && <CheckCircle size={16} fill="var(--success)" stroke="white" strokeWidth={2.5} />}
+                        </div>
+                        
+                        <div style={{ fontSize: "0.875rem", color: "var(--text-medium)" }}>
+                          {profileAge ? `${profileAge} yrs` : "—"} &bull; {profile.height || "—"} &bull; {profile.religion || "—"}
+                        </div>
+                        
+                        <div style={{ display: "flex", flexDirection: "column", gap: "4px", fontSize: "0.875rem", color: "var(--text-medium)" }}>
+                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><Briefcase size={13} color="#ccc" /> {profile.occupation && profile.occupation !== "Not Working" ? profile.occupation : "Not working"}</div>
+                           <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><MapPin size={13} color="#ccc" /> {profile.location || "—"}</div>
+                        </div>
+
+                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap", marginTop: "0.25rem" }}>
+                           {profile.education && <span style={{ background: "#f8f9fa", padding: "4px 12px", borderRadius: "16px", fontSize: "0.75rem", fontWeight: 600, color: "var(--text-medium)", border: "1px solid var(--border-light)" }}>{profile.education}</span>}
+                           {p.maritalStatus && <span style={{ background: "#f8f9fa", padding: "4px 12px", borderRadius: "16px", fontSize: "0.75rem", fontWeight: 600, color: "var(--text-medium)", border: "1px solid var(--border-light)" }}>{p.maritalStatus}</span>}
+                        </div>
+                        
+                        <div style={{ display: "flex", gap: "0.75rem", marginTop: "auto", paddingTop: "0.5rem" }}>
+                          <button onClick={handleShortlist} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0.5rem 1.25rem", background: shortlisted ? "var(--primary-light)" : "transparent", border: "1.5px solid var(--primary)", borderRadius: "var(--radius-full)", color: "var(--primary)", fontWeight: 600, fontSize: "0.8125rem", cursor: "pointer" }}>
+                            <BookmarkPlus size={14} fill={shortlisted ? "var(--primary)" : "none"} /> {shortlisted ? "Shortlisted" : "Shortlist"}
+                          </button>
+                          <button onClick={handleSendInterest} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0.5rem 1.25rem", background: "var(--primary)", border: "1.5px solid var(--primary)", borderRadius: "var(--radius-full)", color: "#fff", fontWeight: 600, fontSize: "0.8125rem", cursor: "pointer" }}>
+                            <MessageCircle size={14} /> Message
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {/* RIGHT HEADER: About Me */}
+                    <div style={{ flex: "1", minWidth: "250px", background: "#fff", borderRadius: "var(--radius-xl)", border: "1px solid var(--border-color)", padding: "1.5rem", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column" }}>
+                      <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--primary)", marginBottom: "0.75rem", marginTop: 0 }}>About Me</h3>
+                      <p style={{ fontSize: "0.8125rem", color: "var(--text-medium)", lineHeight: 1.6, margin: 0 }}>
+                        My {profile.gender === "female" ? "friend" : "son"} has completed {profile.education || "Bachelor's degree"}. Currently {profile.occupation === "Not Working" ? "not working" : `working as ${profile.occupation}`} and lives in {profile.location || "Chennai"}. Looking for a partner who shares similar values and dreams.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* TABS SECTION */}
+                  <div style={{ background: "#fff", borderRadius: "var(--radius-xl)", border: "1px solid var(--border-color)", padding: "0", boxShadow: "var(--shadow-sm)", overflow: "hidden" }}>
+                    <div style={{ display: "flex", gap: "1.5rem", borderBottom: "1px solid var(--border-light)", padding: "0 1.5rem", overflowX: "auto" }}>
+                      {["Profile Details", "Family Details", "Education & Career", "Expectations"].map((tab) => (
+                        <button key={tab} onClick={() => setActiveProfileTab(tab)} style={{ background: "none", border: "none", padding: "1rem 0", color: activeProfileTab === tab ? "var(--primary)" : "var(--text-medium)", fontWeight: activeProfileTab === tab ? 700 : 500, fontSize: "0.875rem", cursor: "pointer", borderBottom: activeProfileTab === tab ? "2px solid var(--primary)" : "2px solid transparent", outline: "none", whiteSpace: "nowrap" }}>
+                          {tab}
                         </button>
-                        <button 
-                          onClick={handleShortlist}
-                          style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0.5rem 1rem", background: shortlisted ? "var(--success)" : "#fff", border: "1.5px solid var(--success)", borderRadius: "var(--radius-full)", color: shortlisted ? "#fff" : "var(--success)", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer", whiteSpace: "nowrap" }}>
-                          <BookmarkPlus size={14} /> {shortlisted ? "Shortlisted" : "Shortlist"}
-                        </button>
-                        {canViewContact ? (
-                          <Link href={`#section-Contact-Details`} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0.5rem 1rem", background: "#fff", border: "1.5px solid #10b981", borderRadius: "var(--radius-full)", color: "#10b981", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer", textDecoration: "none" }}>
-                            <Phone size={14} /> Contact
-                          </Link>
-                        ) : (
-                          <Link href="/membership" style={{ display: "flex", alignItems: "center", gap: "6px", padding: "0.5rem 1rem", background: "#f3f4f6", border: "1.5px solid #d1d5db", borderRadius: "var(--radius-full)", color: "#9ca3af", fontWeight: 600, fontSize: "0.875rem", cursor: "pointer", textDecoration: "none" }}>
-                            <Lock size={14} /> <span style={{ filter: "blur(3px)" }}>Contact</span>
-                          </Link>
+                      ))}
+                    </div>
+                    
+                    {/* TAB CONTENT */}
+                    <div style={{ padding: "1.5rem" }}>
+                      <div className="profile-attr-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 2rem" }}>
+                        {activeProfileTab === "Profile Details" && (
+                          <>
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <tbody>
+                                <InfoRow label="Age" value={profileAge ? `${profileAge} Years` : undefined} />
+                                <InfoRow label="Height" value={profile.height || undefined} />
+                                <InfoRow label="Religion" value={p.religion || undefined} />
+                                <InfoRow label="Community" value={p.community || (p.caste && p.subcaste ? `${p.caste} / ${p.subcaste}` : p.caste || p.subcaste || undefined)} />
+                                <InfoRow label="Location" value={profile.location || undefined} />
+                              </tbody>
+                            </table>
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <tbody>
+                                <InfoRow label="Occupation" value={profile.occupation || undefined} />
+                                <InfoRow label="Annual Income" value={profile.income || undefined} />
+                                <InfoRow label="Education" value={profile.education || undefined} />
+                                <InfoRow label="Marital Status" value={p.maritalStatus || "Never Married"} />
+                                <InfoRow label="Mother Tongue" value={p.motherTongue || "Tamil"} />
+                              </tbody>
+                            </table>
+                          </>
+                        )}
+                        
+                        {activeProfileTab === "Family Details" && (
+                          <>
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <tbody>
+                                <InfoRow label="Family Values" value={p.familyType ? (p.familyType === "Joint Family" ? "Traditional" : "Modern") : undefined} />
+                                <InfoRow label="Family Type" value={p.familyType || undefined} />
+                                <InfoRow label="Family Status" value={p.familyStatus || undefined} />
+                              </tbody>
+                            </table>
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <tbody>
+                                <InfoRow label="Father's Occupation" value={p.fatherOccupation || undefined} />
+                                <InfoRow label="Mother's Occupation" value={p.motherOccupation || undefined} />
+                                <InfoRow label="No. of Brothers" value={p.brothers !== undefined ? String(p.brothers) : undefined} />
+                                <InfoRow label="No. of Sisters" value={p.sisters !== undefined ? String(p.sisters) : undefined} />
+                              </tbody>
+                            </table>
+                          </>
+                        )}
+
+                        {activeProfileTab === "Education & Career" && (
+                          <>
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <tbody>
+                                <InfoRow label="Qualification" value={profile.education || undefined} />
+                                <InfoRow label="Institution" value={p.college || undefined} />
+                              </tbody>
+                            </table>
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <tbody>
+                                <InfoRow label="Occupation" value={profile.occupation || undefined} />
+                                <InfoRow label="Company" value={p.company || undefined} />
+                                <InfoRow label="Annual Income" value={profile.income || undefined} />
+                              </tbody>
+                            </table>
+                          </>
+                        )}
+
+                        {activeProfileTab === "Expectations" && (
+                          <>
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <tbody>
+                                <InfoRow label="Age Preference" value={p.partnerAgeMin || p.partnerAgeMax ? `${p.partnerAgeMin || 21} to ${p.partnerAgeMax || 35} Years` : "21 to 35 Years"} />
+                                <InfoRow label="Height" value={p.partnerHeightMin || p.partnerHeightMax ? `${p.partnerHeightMin ? p.partnerHeightMin + " cm" : "5'0\""} - ${p.partnerHeightMax ? p.partnerHeightMax + " cm" : "6'0\""}` : "5'0\" - 6'0\""} />
+                                <InfoRow label="Marital Status" value={Array.isArray(p.partnerMaritalStatus) && p.partnerMaritalStatus.length > 0 ? p.partnerMaritalStatus.join(", ") : typeof p.partnerMaritalStatus === "string" ? p.partnerMaritalStatus : "Never Married"} />
+                                <InfoRow label="Religion / Community" value={`${p.partnerReligion || "Any"} / ${p.partnerCaste || "Any"}`} />
+                              </tbody>
+                            </table>
+                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                              <tbody>
+                                <InfoRow label="Mother Tongue" value={Array.isArray(p.partnerMotherTongue) && p.partnerMotherTongue.length > 0 ? p.partnerMotherTongue.join(", ") : typeof p.partnerMotherTongue === "string" ? p.partnerMotherTongue : "Tamil"} />
+                                <InfoRow label="Education" value={p.partnerEducation || "Graduate / Any Professional Degree"} />
+                                <InfoRow label="Occupation" value={p.partnerOccupation || "Any / Private or Govt Sector"} />
+                                <InfoRow label="Country of Residence" value={p.partnerCountry || "India"} />
+                              </tbody>
+                            </table>
+                          </>
                         )}
                       </div>
                     </div>
@@ -1114,7 +1197,8 @@ function ProfileDetailPage({
                 </div>
               )}
 
-              {/* ══════════════════════════════════════════════════
+              {isOwnProfile && (<>
+{/* ══════════════════════════════════════════════════
                   2. UPLOAD PHOTOS PROMPT (only if isOwnProfile and no photo)
                   ══════════════════════════════════════════════════ */}
               {isOwnProfile && !profile.photoUrl && (
@@ -1539,7 +1623,9 @@ function ProfileDetailPage({
                 </div>
               </SectionCard>
               )}
-            </div>
+            
+</>)}
+</div>
 
             {/* ── RIGHT PANEL — Partner Preferences etc. ── */}
             {isOwnProfile && (

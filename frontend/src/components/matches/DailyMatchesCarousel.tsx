@@ -56,7 +56,8 @@ export default function DailyMatchesCarousel() {
 
   const handleShortlist = async (p: RegisteredUser) => {
     if (!user) { toast.error("Please login"); return; }
-    await shortlistProfile(user.id, p.id);
+    const { error } = await shortlistProfile(user.id, p.id);
+    if (error) { toast.error(error); return; }
     toast.success(`${p.name} shortlisted!`);
   };
 

@@ -604,9 +604,15 @@ export async function loginToProfile(profileId: string): Promise<RegisteredUser 
     }
   }
 
-  // ── Fallback for DB-seeded profiles ──
-  // If profile exists in the DB, establish local session context for the profile
-  console.info(`[loginToProfile] Authenticated profile ${profileId} (${profile.name})`);
+  // ── Fallback for DB-seeded profiles (Mock Session) ──
+  // If we exhausted all emails and none worked, we cannot establish a real Supabase session.
+  // We return the user profile to allow UI navigation, but RLS will fail for any inserts.
+  console.error(`[loginToProfile] WARNING: Authenticated profile ${profileId} via MOCK SESSION. Supabase RLS will fail.`);
+  if (typeof window !== 'undefined') {
+    import('react-hot-toast').then(({ default: toast }) => {
+      toast.error("Mock Session: Supabase RLS will block inserts (Missing Service Role Key)", { duration: 5000 });
+    });
+  }
   return dbToUser(profile);
 }
 
@@ -1196,24 +1202,46 @@ export async function fetchLatestProfiles(limit = 12): Promise<RegisteredUser[]>
 export async function shortlistProfile(
   userId: string,
   targetId: string
-): Promise<void> {
+): Promise<{ error?: string }> {
   if (targetId.startsWith('ETM')) {
     console.log(`[Mock] Shortlisted profile ${targetId}`);
-    return;
+    return {};
   }
 
-  const { data: existing } = await supabase
+  // --- DEBUGGING SUPABASE AUTH VS PAYLOAD ---
+  const { data: authData } = await supabase.auth.getUser();
+  console.log('[DEBUG shortlistProfile] Auth session User ID:', authData?.user?.id);
+  console.log('[DEBUG shortlistProfile] Insert Payload user_id:', userId);
+  console.log('[DEBUG shortlistProfile] Do they match?', authData?.user?.id === userId);
+  // ------------------------------------------
+
+  const { data: existing, error: existingError } = await supabase
     .from('shortlists')
     .select('id')
     .eq('user_id', userId)
     .eq('target_id', targetId)
     .maybeSingle();
 
+  if (existingError) {
+    console.error('Error checking existing shortlist:', existingError);
+    return { error: existingError.message };
+  }
+
   if (!existing) {
-    await supabase
+    const { error: insertError } = await supabase
       .from('shortlists')
       .insert({ user_id: userId, target_id: targetId });
+    if (insertError) {
+      console.error('Error inserting shortlist:', {
+        message: insertError.message,
+        code: insertError.code,
+        details: insertError.details,
+        hint: insertError.hint,
+      });
+      return { error: insertError.message || JSON.stringify(insertError) };
+    }
   }
+  return {};
 }
 
 /**
@@ -1222,13 +1250,19 @@ export async function shortlistProfile(
 export async function removeShortlist(
   userId: string,
   targetId: string
-): Promise<void> {
-  if (targetId.startsWith('ETM')) return;
-  await supabase
+): Promise<{ error?: string }> {
+  if (targetId.startsWith('ETM')) return {};
+  const { error } = await supabase
     .from('shortlists')
     .delete()
     .eq('user_id', userId)
     .eq('target_id', targetId);
+    
+  if (error) {
+    console.error('Error removing shortlist:', error);
+    return { error: error.message };
+  }
+  return {};
 }
 
 /**
@@ -1237,11 +1271,15 @@ export async function removeShortlist(
 export async function getShortlistedProfiles(
   userId: string
 ): Promise<RegisteredUser[]> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('shortlists')
     .select('target_id, profiles!shortlists_target_id_fkey(*)')
     .eq('user_id', userId);
 
+  if (error) {
+    console.error('Error fetching shortlisted profiles:', error);
+    throw new Error(error.message);
+  }
   if (!data) return [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return data.map((row: any) => dbToUser(row.profiles)).filter(Boolean);
@@ -1319,6 +1357,22 @@ export async function sendInterest(
       .insert({ sender_id: senderId, receiver_id: receiverId, status: 'pending', message: message || null });
     return { error: error?.message };
   }
+}
+
+/**
+ * Withdraw an interest (sender calls this).
+ */
+export async function withdrawInterestByUsers(
+  senderId: string,
+  receiverId: string
+): Promise<{ error?: string }> {
+  if (receiverId.startsWith('ETM')) return {};
+  const { error } = await supabase
+    .from('interests')
+    .delete()
+    .eq('sender_id', senderId)
+    .eq('receiver_id', receiverId);
+  return { error: error?.message };
 }
 
 /**
@@ -2121,7 +2175,7 @@ export async function createNotification(
   href?: string,
   data?: Record<string, unknown>
 ): Promise<void> {
-  await supabase.from('notifications').insert({
+  const { error } = await supabase.from('notifications').insert({
     user_id: userId,
     type,
     title,
@@ -2129,6 +2183,9 @@ export async function createNotification(
     href: href ?? null,
     data: data ?? {},
   });
+  if (error) {
+    console.error('Error creating notification:', error);
+  }
 }
 
 export async function getNotifications(userId: string): Promise<NotificationRow[]> {
@@ -2382,23 +2439,32 @@ export async function shortlistProfileWithNotification(
   userId: string,
   targetId: string,
   userName?: string
-): Promise<void> {
+): Promise<{ error?: string }> {
   if (targetId.startsWith('ETM')) {
     console.log(`[Mock] Shortlisted profile with notification ${targetId}`);
-    return;
+    return {};
   }
 
-  const { data: existing } = await supabase
+  const { data: existing, error: existingError } = await supabase
     .from('shortlists')
     .select('id')
     .eq('user_id', userId)
     .eq('target_id', targetId)
     .maybeSingle();
 
+  if (existingError) {
+    console.error('Error checking existing shortlist with notification:', existingError);
+    return { error: existingError.message };
+  }
+
   if (!existing) {
-    await supabase
+    const { error: insertError } = await supabase
       .from('shortlists')
       .insert({ user_id: userId, target_id: targetId });
+    if (insertError) {
+      console.error('Error inserting shortlist with notification:', insertError);
+      return { error: insertError.message };
+    }
   }
 
   await createNotification(
@@ -2410,6 +2476,7 @@ export async function shortlistProfileWithNotification(
       : 'A member shortlisted your profile.',
     '/matches?tab=shortlisted_you'
   );
+  return {};
 }
 
 /**

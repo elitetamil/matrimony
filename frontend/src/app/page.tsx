@@ -490,6 +490,8 @@ function AuthenticatedDashboard() {
   const [targetAccount, setTargetAccount] = useState<RegisteredUser | null>(null);
   const [upgrading, setUpgrading] = useState(false);
   const recScrollRef = useRef<HTMLDivElement>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
 
   // Dynamic Greeting based on local time
   const getGreeting = () => {
@@ -605,6 +607,18 @@ function AuthenticatedDashboard() {
     }
   };
 
+  const handleRecsScroll = () => {
+    if (recScrollRef.current) {
+      const { scrollLeft, scrollWidth, clientWidth } = recScrollRef.current;
+      setCanScrollLeft(scrollLeft > 0);
+      setCanScrollRight(Math.ceil(scrollLeft + clientWidth) < scrollWidth);
+    }
+  };
+
+  useEffect(() => {
+    handleRecsScroll();
+  }, [dailyRecs, loadingRecs]);
+
   // Handle shortlist toggle
   const handleToggleShortlist = async (e: React.MouseEvent, targetId: string) => {
     e.preventDefault();
@@ -612,18 +626,24 @@ function AuthenticatedDashboard() {
     if (!user) return;
     const isCurrently = shortlistedIds.has(targetId);
     const nextSet = new Set(shortlistedIds);
-    if (isCurrently) {
-      nextSet.delete(targetId);
-      setShortlistedIds(nextSet);
-      setMatchCounts(prev => ({ ...prev, shortlistedByYou: Math.max(0, prev.shortlistedByYou - 1) }));
-      await removeShortlist(user.id, targetId);
-      toast.success("Removed from shortlist");
-    } else {
-      nextSet.add(targetId);
-      setShortlistedIds(nextSet);
-      setMatchCounts(prev => ({ ...prev, shortlistedByYou: prev.shortlistedByYou + 1 }));
-      await shortlistProfile(user.id, targetId);
-      toast.success("Added to shortlist");
+    try {
+      if (isCurrently) {
+        const res = await removeShortlist(user.id, targetId);
+        if (res?.error) { toast.error(res.error); return; }
+        nextSet.delete(targetId);
+        setShortlistedIds(nextSet);
+        setMatchCounts(prev => ({ ...prev, shortlistedByYou: Math.max(0, prev.shortlistedByYou - 1) }));
+        toast.success("Removed from shortlist");
+      } else {
+        const res = await shortlistProfile(user.id, targetId);
+        if (res?.error) { toast.error(res.error); return; }
+        nextSet.add(targetId);
+        setShortlistedIds(nextSet);
+        setMatchCounts(prev => ({ ...prev, shortlistedByYou: prev.shortlistedByYou + 1 }));
+        toast.success("Added to shortlist");
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update shortlist");
     }
   };
 
@@ -904,7 +924,7 @@ function AuthenticatedDashboard() {
                   <span className="nav-badge-pill">{matchCounts.whoViewedYou}</span>
                 )}
               </Link>
-              <Link href="/shortlisted" className="side-nav-link">
+              <Link href="/matches?tab=shortlisted_by_you" className="side-nav-link">
                 <Bookmark size={16} /> Shortlisted Profiles
               </Link>
               <Link href="/settings" className="side-nav-link">
@@ -980,8 +1000,8 @@ function AuthenticatedDashboard() {
             <div
               style={{
                 margin: "0.5rem 0.875rem 1rem",
-                background: isPremium 
-                  ? "linear-gradient(135deg, #FFF9F0 0%, #FFF0DC 100%)" 
+                background: isPremium
+                  ? "linear-gradient(135deg, #FFF9F0 0%, #FFF0DC 100%)"
                   : "linear-gradient(135deg, #FFF9F5 0%, #FFF3EC 100%)",
                 border: isPremium ? "1px solid #F5DAB0" : "1px solid #F5E0D5",
                 borderRadius: "10px",
@@ -1183,7 +1203,7 @@ function AuthenticatedDashboard() {
 
             {/* 4: Shortlisted */}
             <Link
-              href="/shortlisted"
+              href="/matches?tab=shortlisted_by_you"
               style={{
                 background: "#FFFFFF",
                 border: "1px solid #EFE8DE",
@@ -1271,13 +1291,15 @@ function AuthenticatedDashboard() {
                 </div>
                 <button
                   onClick={() => scrollRecs("left")}
-                  style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFFFFF", border: "1px solid #E5D5C5", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#6B1A2A" }}
+                  disabled={!canScrollLeft}
+                  style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFFFFF", border: "1px solid #E5D5C5", display: "flex", alignItems: "center", justifyContent: "center", cursor: canScrollLeft ? "pointer" : "not-allowed", color: canScrollLeft ? "#6B1A2A" : "#C0A8B0", opacity: canScrollLeft ? 1 : 0.6 }}
                 >
                   <ChevronLeft size={14} />
                 </button>
                 <button
                   onClick={() => scrollRecs("right")}
-                  style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFFFFF", border: "1px solid #E5D5C5", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#6B1A2A" }}
+                  disabled={!canScrollRight}
+                  style={{ width: "26px", height: "26px", borderRadius: "50%", background: "#FFFFFF", border: "1px solid #E5D5C5", display: "flex", alignItems: "center", justifyContent: "center", cursor: canScrollRight ? "pointer" : "not-allowed", color: canScrollRight ? "#6B1A2A" : "#C0A8B0", opacity: canScrollRight ? 1 : 0.6 }}
                 >
                   <ChevronRight size={14} />
                 </button>
@@ -1287,6 +1309,7 @@ function AuthenticatedDashboard() {
             {/* Carousel Container */}
             <div
               ref={recScrollRef}
+              onScroll={handleRecsScroll}
               className="recs-carousel-track"
               style={{
                 display: "flex",
@@ -2346,13 +2369,15 @@ export default function HomePage() {
             >
               <div
                 style={{
-                  fontSize: "0.9375rem",
-                  fontWeight: 800,
-                  letterSpacing: "0.18em",
+                  fontSize: "clamp(2.5rem, 5.5vw, 4.25rem)",
+                  fontWeight: 700,
+                  letterSpacing: "-0.01em",
+                  lineHeight: 1.15,
                   color: "#E0C070",
                   textTransform: "uppercase",
-                  marginBottom: "0.875rem",
-                  fontFamily: "'Montserrat', 'Poppins', 'Inter', var(--font-sans)",
+                  marginBottom: "1.25rem",
+                  marginTop: "-3rem",
+                  fontFamily: "var(--font-heading)",
                   textShadow: "0 2px 4px rgba(0, 0, 0, 0.9), 0 0 3px rgba(0, 0, 0, 1)",
                 }}
               >

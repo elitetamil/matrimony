@@ -410,7 +410,7 @@ export default function MembershipPage() {
           subtitle="Find Your Perfect Tamil Match Faster." 
         />
 
-        <section style={{ maxWidth: "1100px", margin: "1.5rem auto 0", padding: "0 1rem 3rem", position: "relative", zIndex: 1 }}>
+        <section style={{ maxWidth: "1100px", margin: "0 auto", padding: "0 1.25rem 3rem", position: "relative", zIndex: 1 }}>
           {loading ? (
             <div style={{ textAlign: "center", padding: "4rem 1rem" }}>
               <div style={{ width: "36px", height: "36px", border: "3px solid #e0e0e0", borderTopColor: "#6B1A2A", borderRadius: "50%", animation: "spin 0.7s linear infinite", margin: "0 auto" }} />
@@ -453,7 +453,6 @@ export default function MembershipPage() {
           grid-template-columns: repeat(3, 1fr);
           gap: 1.25rem;
           align-items: stretch;
-          padding-top: 0.5rem;
         }
         @media (max-width: 900px) {
           .plans-scroll-wrapper {

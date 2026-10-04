@@ -187,7 +187,7 @@ img {
 }
 
 h1, h2, .section-title, .text-display {
-  font-family: var(--font-heading);
+  font-family:var(--font-heading);
 }
 
 .text-display {

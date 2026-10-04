@@ -1,3 +1,4 @@
+// Trigger Turbopack recompile
 "use client";
 
 import Link from "next/link";
@@ -557,7 +558,7 @@ export default function Navbar() {
                       { label: "My Profile", href: `/profile/${user.id}`, icon: <User size={14} /> },
                       { label: "Edit Profile", href: "/profile/edit", icon: <Settings size={14} /> },
                       { label: "My Matches", href: "/matches", icon: <Heart size={14} /> },
-                      { label: "Shortlisted Profiles", href: "/shortlisted", icon: <Bookmark size={14} /> },
+                      { label: "Shortlisted Profiles", href: "/matches?tab=shortlisted_by_you", icon: <Bookmark size={14} /> },
                       { label: "Profile Visitors", href: "/notifications", icon: <Eye size={14} /> },
                       { label: "Interests", href: "/interests", icon: <Send size={14} /> },
                       { label: "Membership", href: "/membership", icon: <Crown size={14} /> },

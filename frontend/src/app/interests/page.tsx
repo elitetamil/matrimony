@@ -59,15 +59,15 @@ function PaidBadge() {
         alignItems: "center",
         gap: "4px",
         background: "#fff3e0",
-        border: "1px solid #E8401A",
+        border: "1px solid var(--primary)",
         borderRadius: "3px",
         padding: "1px 7px",
         fontSize: "0.6875rem",
         fontWeight: 700,
-        color: "#E8401A",
+        color: "var(--primary)",
       }}
     >
-      <svg width="9" height="9" viewBox="0 0 24 24" fill="#E8401A">
+      <svg width="9" height="9" viewBox="0 0 24 24" fill="var(--primary)">
         <path d="M12 1l3 8H23l-7 5 3 8-7-5-7 5 3-8-7-5h8z"/>
       </svg>
       Paid Member
@@ -236,7 +236,7 @@ function ReceivedCard({
                 padding: "0.4375rem 1.25rem",
                 border: "none",
                 borderRadius: "20px",
-                background: "#E8401A",
+                background: "var(--primary)",
                 color: "#fff",
                 fontSize: "0.8125rem", fontWeight: 700,
                 cursor: loading ? "wait" : "pointer",
@@ -259,7 +259,7 @@ function ReceivedCard({
                 display: "flex", alignItems: "center", gap: "5px",
                 padding: "0.4375rem 1.25rem",
                 border: "none", borderRadius: "20px",
-                background: "#E8401A", color: "#fff",
+                background: "var(--primary)", color: "#fff",
                 fontSize: "0.8125rem", fontWeight: 700,
                 textDecoration: "none",
                 fontFamily: "var(--font-sans)",
@@ -392,7 +392,7 @@ function SentCard({
                 display: "flex", alignItems: "center", gap: "5px",
                 padding: "0.4375rem 1.125rem",
                 border: "none", borderRadius: "20px",
-                background: "#E8401A", color: "#fff",
+                background: "var(--primary)", color: "#fff",
                 fontSize: "0.8125rem", fontWeight: 700,
                 textDecoration: "none",
                 fontFamily: "var(--font-sans)",

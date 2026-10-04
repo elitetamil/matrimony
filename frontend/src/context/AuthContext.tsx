@@ -58,19 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    const activeProfileId = typeof window !== "undefined" ? localStorage.getItem("etm_active_profile_id") : null;
-    
-    if (activeProfileId) {
-      const profile = await fetchProfile(activeProfileId);
+    const { data } = await supabase.auth.getUser();
+    if (data.user) {
+      const profile = await fetchProfile(data.user.id);
       setUser(profile);
     } else {
-      const { data } = await supabase.auth.getUser();
-      if (data.user) {
-        const profile = await fetchProfile(data.user.id);
-        setUser(profile);
-      } else {
-        setUser(null);
-      }
+      setUser(null);
     }
     setLoading(false);
   }, [setUser]);
@@ -81,14 +74,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [setUser]);
 
   useEffect(() => {
-    // Initial session load
     supabase.auth.getSession().then(async ({ data }) => {
-      const activeProfileId = typeof window !== "undefined" ? localStorage.getItem("etm_active_profile_id") : null;
-      
-      if (activeProfileId) {
-        const profile = await fetchProfile(activeProfileId);
-        setUser(profile);
-      } else if (data.session?.user) {
+      if (data.session?.user) {
         const profile = await fetchProfile(data.session.user.id);
         setUser(profile);
       } else {
@@ -103,17 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // TOKEN_REFRESHED: Supabase silently refreshed the JWT in the background.
         if (event === "TOKEN_REFRESHED") return;
         
-        const activeProfileId = typeof window !== "undefined" ? localStorage.getItem("etm_active_profile_id") : null;
-
         if (session?.user) {
-          if (activeProfileId) {
-            // Obey the manual switch account override
-            const profile = await fetchProfile(activeProfileId);
-            setUser(profile);
-            setLoading(false);
-            return;
-          }
-
           // For SIGNED_IN (new registration), retry in case profile row is being created
           const profile =
             event === "SIGNED_IN"
@@ -123,10 +100,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser(profile);
           setLoading(false);
         } else {
-          // Only reset to null if there is no fallback active profile stored in localStorage
-          if (!activeProfileId) {
-            setUser(null);
-          }
+          setUser(null);
           setLoading(false);
         }
       }

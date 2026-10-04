@@ -5,7 +5,7 @@ import { CheckCircle, MapPin, Briefcase, GraduationCap, Heart, BookmarkPlus, Mes
 import { useState } from "react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
-import { sendInterest } from "@/lib/auth-store";
+import { sendInterest, withdrawInterestByUsers } from "@/lib/auth-store";
 import { useRouter } from "next/navigation";
 import ConfirmDialog from "./ConfirmDialog";
 
@@ -85,6 +85,7 @@ export default function ProfileCard({ profile, variant = "full", from }: Profile
     }
     if (interested) {
       setInterested(false);
+      await withdrawInterestByUsers(user.id, profile.id);
       toast("Interest withdrawn");
       return;
     }

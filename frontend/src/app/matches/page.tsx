@@ -33,6 +33,7 @@ import {
   getStarMatches,
   getHoroscopeMatches,
   getInterestsSent,
+  withdrawInterestByUsers,
   type RegisteredUser,
 } from "@/lib/auth-store";
 import DailyMatchesCarousel from "@/components/matches/DailyMatchesCarousel";
@@ -517,8 +518,9 @@ function MatchesContent({ user, canMessage, canViewContact, initialTab, isPremiu
       setConfirmAction({
         isOpen: true,
         message: `Are you sure you want to withdraw your interest from ${name}?`,
-        onConfirm: () => {
+        onConfirm: async () => {
           setSentInterestIds((prev) => { const s = new Set(prev); s.delete(profileId); return s; });
+          await withdrawInterestByUsers(user.id, profileId);
           toast(`Interest withdrawn from ${name}`);
         }
       });
@@ -794,7 +796,7 @@ function MatchesContent({ user, canMessage, canViewContact, initialTab, isPremiu
                     width: "16px",
                     height: "16px",
                     borderRadius: "50%",
-                    background: "#E8401A",
+                    background: "var(--primary)",
                     color: "#fff",
                     fontSize: "0.625rem",
                     fontWeight: 800,

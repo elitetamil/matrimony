@@ -288,14 +288,16 @@ function SearchContent() {
 
   const handleSendInterest = async (profileId: string, name: string) => {
     if (!user) { toast.error("Please login"); return; }
-    await sendInterestWithNotification(user.id, profileId, user.name);
+    const { error } = await sendInterestWithNotification(user.id, profileId, user.name);
+    if (error) { toast.error(error); return; }
     setSentInterestIds(prev => new Set([...prev, profileId]));
     toast.success(`Interest sent to ${name}!`);
   };
 
   const handleShortlist = async (profileId: string, name: string) => {
     if (!user) { toast.error("Please login"); return; }
-    await shortlistProfileWithNotification(user.id, profileId);
+    const { error } = await shortlistProfileWithNotification(user.id, profileId);
+    if (error) { toast.error(error); return; }
     setShortlistedIds(prev => new Set([...prev, profileId]));
     toast.success(`${name} shortlisted!`);
   };
