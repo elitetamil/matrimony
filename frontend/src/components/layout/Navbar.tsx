@@ -836,7 +836,6 @@ export default function Navbar() {
     { label: "About Us", href: "/about" },
     { label: "Matches", href: "/matches" },
     { label: "Success Stories", href: "/success-stories" },
-    { label: "Features", href: "/#how-it-works" },
     { label: "Contact", href: "/contact" },
   ];
 

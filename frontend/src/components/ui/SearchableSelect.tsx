@@ -73,14 +73,15 @@ export default function SearchableSelect({
   }, [isOpen]);
 
   // Filter: use includes for better searchability, prioritize prefix matches
-  const filteredOptions = search.trim()
+  const searchLower = search.trim().toLowerCase();
+  const filteredOptions = searchLower
     ? normalized
         .filter((opt) =>
-          opt.label.toLowerCase().includes(search.toLowerCase())
+          opt.label.toLowerCase().includes(searchLower)
         )
         .sort((a, b) => {
-          const aStarts = a.label.toLowerCase().startsWith(search.toLowerCase());
-          const bStarts = b.label.toLowerCase().startsWith(search.toLowerCase());
+          const aStarts = a.label.toLowerCase().startsWith(searchLower);
+          const bStarts = b.label.toLowerCase().startsWith(searchLower);
           if (aStarts && !bStarts) return -1;
           if (!aStarts && bStarts) return 1;
           return a.label.localeCompare(b.label);

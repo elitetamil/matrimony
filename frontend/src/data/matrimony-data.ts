@@ -832,6 +832,7 @@ export const CASTE_TO_SUBCASTE: Record<string, string[]> = {
   ],
   'Chettiar': [
     '24 Manai Telugu Chettiar',
+    '24 Manai Telungu Chettiyar',
     '24 Manai Telugu Chettiar 16 Veedu',
     '24 Manai Telugu Chettiar 8 Veedu',
     '24 Manal Telugu Chettiar',

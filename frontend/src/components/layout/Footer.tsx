@@ -25,7 +25,6 @@ const ABOUT_US_LINKS = [
 
 const HELP_SUPPORT_LINKS = [
   { label: "Contact Us", href: "/contact" },
-  { label: "How It Works", href: "/how-it-works" },
   { label: "Membership Plans", href: "/membership" },
   { label: "Privacy Policy", href: "/privacy-policy" },
   { label: "Terms & Conditions", href: "/terms" },
