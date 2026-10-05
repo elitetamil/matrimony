@@ -2390,7 +2390,7 @@ export default function HomePage() {
                   textShadow: "0 2px 10px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.7)",
                 }}
               >
-                <span style={{ color: "#FFFDF8", whiteSpace: "nowrap" }}>Tradition Meets True Connections</span>
+                <span style={{ color: "#FFFDF8", whiteSpace: "nowrap" }}>Tradition Meets <span style={{ color: "var(--gold-light)" }}>True Connections</span></span>
               </h1>
 
               <p
@@ -2398,7 +2398,7 @@ export default function HomePage() {
                   fontSize: "clamp(1.0625rem, 2vw, 1.25rem)",
                   color: "#FFFDF8",
                   lineHeight: 1.6,
-                  maxWidth: "680px",
+                  maxWidth: "900px",
                   margin: "0 auto",
                   fontWeight: 400,
                   fontFamily: "var(--font-sans)",
@@ -2422,6 +2422,7 @@ export default function HomePage() {
                 border: "1px solid rgba(255, 255, 255, 0.2)",
                 boxShadow: "0 12px 36px rgba(0, 0, 0, 0.3)",
                 width: "100%",
+                transform: "translateY(-6rem)",
               }}
             >
               <form onSubmit={handleHeroSearch} style={{ display: "flex", flexWrap: "wrap", gap: "0.75rem", alignItems: "flex-end" }}>
