@@ -716,17 +716,10 @@ function AuthenticatedDashboard() {
 
   if (!user) return null;
 
-  const pct = computeProfileCompletion(user);
+  const completion = computeProfileCompletion(user);
+  const { pct, hasBasicDetails, hasEducation, hasCareer, hasPartnerPrefs, hasFamilyDetails, hasMorePhotos } = completion;
   const profileCode = `ETM${user.id.replace(/-/g, "").slice(0, 7).toUpperCase()}`;
   const userPhoto = user.photoUrl || null;
-
-  // Dynamic checklist conditions for Right Sidebar "Complete Your Profile"
-  const hasBasicDetails = !!(user.name && user.dob && user.gender);
-  const hasEducation = !!(user.education && user.education !== "—");
-  const hasCareer = !!(user.occupation && user.occupation !== "—");
-  const hasPartnerPrefs = !!(user.partnerAgeMin || user.partnerAgeMax || user.partnerReligion || user.partnerCaste || user.partnerEducation);
-  const hasFamilyDetails = !!(user.fatherOccupation || user.motherOccupation || user.familyStatus || user.familyType || user.nativePlace);
-  const hasMorePhotos = !!(user.photos && user.photos.length > 1);
 
   return (
     <div style={{ background: "#FAF6F0", minHeight: "100vh", fontFamily: "var(--font-sans)" }}>
@@ -1802,7 +1795,7 @@ function AuthenticatedDashboard() {
                 </div>
               </div>
               <div style={{ fontSize: "0.6875rem", color: "#8B6070", lineHeight: 1.35 }}>
-                Complete your profile to get better matches.
+                {pct >= 100 ? "Your profile is fully complete!" : "Complete your profile to get better matches."}
               </div>
             </div>
 
@@ -2367,13 +2360,14 @@ export default function HomePage() {
                 width: "100%",
               }}
             >
+              {/*
               <div
                 style={{
                   fontSize: "clamp(2.5rem, 5.5vw, 4.25rem)",
                   fontWeight: 700,
                   letterSpacing: "-0.01em",
                   lineHeight: 1.15,
-                  color: "#E0C070",
+                  color: "#ebae16ff",
                   textTransform: "uppercase",
                   marginBottom: "1.25rem",
                   marginTop: "-3rem",
@@ -2383,6 +2377,7 @@ export default function HomePage() {
               >
                 ELITE TAMIL MATRIMONY
               </div>
+              */}
 
               <h1
                 style={{
@@ -2395,8 +2390,7 @@ export default function HomePage() {
                   textShadow: "0 2px 10px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.7)",
                 }}
               >
-                <span style={{ display: "block", color: "#FFFDF8" }}>Tradition Meets</span>
-                <span style={{ display: "block", color: "#E0C070", whiteSpace: "nowrap" }}>True Connections</span>
+                <span style={{ color: "#FFFDF8", whiteSpace: "nowrap" }}>Tradition Meets True Connections</span>
               </h1>
 
               <p

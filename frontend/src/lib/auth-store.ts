@@ -1627,25 +1627,57 @@ export async function getDailyRecommendations(
  *
  * Fields: name, gender, dob, religion, caste, education, occupation, city, about, photoUrl
  */
-export function computeProfileCompletion(user: RegisteredUser | null): number {
-  if (!user) return 0;
+export interface ProfileCompletionDetails {
+  pct: number;
+  hasBasicDetails: boolean;
+  hasEducation: boolean;
+  hasCareer: boolean;
+  hasPartnerPrefs: boolean;
+  hasFamilyDetails: boolean;
+  hasMorePhotos: boolean;
+}
+
+export function computeProfileCompletion(user: Partial<RegisteredUser> | null): ProfileCompletionDetails {
+  if (!user) {
+    return {
+      pct: 0,
+      hasBasicDetails: false,
+      hasEducation: false,
+      hasCareer: false,
+      hasPartnerPrefs: false,
+      hasFamilyDetails: false,
+      hasMorePhotos: false
+    };
+  }
+
+  const hasBasicDetails = !!(user.name && user.dob && user.gender);
+  const hasEducation = !!(user.education && user.education !== "—");
+  const hasCareer = !!(user.occupation && user.occupation !== "—");
+  const hasPartnerPrefs = !!(user.partnerAgeMin || user.partnerAgeMax || user.partnerReligion || user.partnerCaste || user.partnerEducation);
+  const hasFamilyDetails = !!(user.fatherOccupation || user.motherOccupation || user.familyStatus || user.familyType || user.nativePlace);
+  const hasMorePhotos = !!(user.photos && user.photos.length > 1);
+
   const fields = [
-    !!user.name?.trim(),
-    !!user.gender,
-    !!user.dob,
-    !!user.religion,
-    !!user.caste,
-    !!user.education,
-    !!user.occupation,
-    !!user.city,
-    !!user.about,
-    !!user.photoUrl,
-    !!(user.partnerAgeMin || user.partnerAgeMax || user.partnerReligion || user.partnerCaste || user.partnerEducation),
-    !!(user.fatherOccupation || user.motherOccupation || user.familyStatus || user.familyType || user.nativePlace),
-    !!(user.photos && user.photos.length > 1),
+    hasBasicDetails,
+    hasEducation,
+    hasCareer,
+    hasPartnerPrefs,
+    hasFamilyDetails,
+    hasMorePhotos
   ];
+  
   const filled = fields.filter(Boolean).length;
-  return Math.round((filled / fields.length) * 100);
+  const pct = Math.round((filled / fields.length) * 100);
+
+  return {
+    pct,
+    hasBasicDetails,
+    hasEducation,
+    hasCareer,
+    hasPartnerPrefs,
+    hasFamilyDetails,
+    hasMorePhotos
+  };
 }
 
 // ── BACKWARD-COMPAT SHIMS ─────────────────────────────────────────────
@@ -2528,3 +2560,18 @@ export async function sendInterestWithNotification(
 
   return { error: finalError?.message };
 }
+
+/**
+ * Save horoscope record in horoscopes table
+ */
+export async function saveHoroscope(userId: string, fileUrl: string, fileName?: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('horoscopes')
+      .upsert({ user_id: userId, file_url: fileUrl, file_name: fileName || 'horoscope' }, { onConflict: 'user_id' });
+    if (error) console.warn('Failed to save horoscope row:', error);
+  } catch (e) {
+    console.warn('Error saving horoscope row:', e);
+  }
+}
+

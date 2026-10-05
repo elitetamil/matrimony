@@ -68,6 +68,30 @@ export async function deleteProfilePhoto(
 }
 
 /**
+ * Upload a horoscope document (PDF/JPG/PNG) to Supabase Storage.
+ */
+export async function uploadHoroscopeFile(
+  userId: string,
+  file: File
+): Promise<{ url: string; fileName: string }> {
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const filename = `horoscope_${Date.now()}.${ext}`;
+  const path = `horoscopes/${userId}/${filename}`;
+
+  const { error } = await supabase.storage
+    .from(PROFILE_PHOTOS_BUCKET)
+    .upload(path, file, {
+      contentType: file.type || (ext === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+      upsert: true,
+    });
+
+  if (error) throw new Error(`Horoscope upload failed: ${error.message}`);
+  const { data } = supabase.storage.from(PROFILE_PHOTOS_BUCKET).getPublicUrl(path);
+  return { url: data.publicUrl, fileName: file.name };
+}
+
+
+/**
  * Upload a verification document (private bucket).
  */
 export async function uploadVerificationDoc(

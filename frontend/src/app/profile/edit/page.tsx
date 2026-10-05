@@ -111,7 +111,6 @@ function SectionCard({ id, title, icon, children }: {
         border: "1px solid var(--border-color)",
         borderRadius: "var(--radius-xl)",
         marginBottom: "1.25rem",
-        overflow: "hidden",
         boxShadow: "var(--shadow-sm)",
         scrollMarginTop: "80px",
       }}
@@ -123,6 +122,8 @@ function SectionCard({ id, title, icon, children }: {
         alignItems: "center",
         gap: "0.625rem",
         background: "#FAFAFA",
+        borderTopLeftRadius: "calc(var(--radius-xl) - 1px)",
+        borderTopRightRadius: "calc(var(--radius-xl) - 1px)",
       }}>
         <span style={{ color: "var(--primary)" }}>{icon}</span>
         <h2 style={{ fontSize: "0.9375rem", fontWeight: 700, color: "var(--text-dark)", margin: 0 }}>{title}</h2>
@@ -163,7 +164,7 @@ function ProfileProgress({ pct }: { pct: number }) {
         <div style={{ height: "100%", width: `${pct}%`, background: "var(--gradient-hero)", borderRadius: "3px", transition: "width 0.5s ease" }} />
       </div>
       <div style={{ fontSize: "0.75rem", color: "var(--text-secondary)", marginTop: "0.375rem" }}>
-        Add more details to improve your matches
+        {pct >= 100 ? "Your profile is fully complete!" : "Add more details to improve your matches"}
       </div>
     </div>
   );
@@ -179,6 +180,7 @@ function MultiSelectTags({ label, values, onChange, options, placeholder = "Sele
 }) {
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
+  const [dropup, setDropup] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -188,6 +190,16 @@ function MultiSelectTags({ label, values, onChange, options, placeholder = "Sele
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  // Determine dropup direction based on space below the input
+  useEffect(() => {
+    if (open && ref.current) {
+      const rect = ref.current.getBoundingClientRect();
+      const viewportHeight = window.visualViewport?.height ?? window.innerHeight;
+      const spaceBelow = viewportHeight - rect.bottom;
+      setDropup(spaceBelow < 260); // same logic as SearchableSelect
+    }
+  }, [open]);
 
   const unselected = options.filter(o => !values.includes(o));
   const filtered = query
@@ -210,7 +222,7 @@ function MultiSelectTags({ label, values, onChange, options, placeholder = "Sele
         className="form-input"
         style={{
           minHeight: "48px", height: "auto", display: "flex", flexWrap: "wrap", gap: "0.375rem",
-          padding: "0.625rem 0.875rem", alignItems: "center", cursor: "text",
+          padding: "0.625rem 2.25rem 0.625rem 0.875rem", alignItems: "center", cursor: "text", position: "relative"
         }}
         onClick={() => { document.getElementById(`multi-input-${label}`)?.focus(); setOpen(true); }}
       >
@@ -246,10 +258,17 @@ function MultiSelectTags({ label, values, onChange, options, placeholder = "Sele
           onFocus={() => setOpen(true)}
           autoComplete="off"
         />
+        <div style={{ position: "absolute", right: "0.875rem", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", display: "flex", alignItems: "center" }}>
+          <ChevronDown size={14} style={{ color: "var(--text-muted)", flexShrink: 0 }} />
+        </div>
       </div>
       {open && (
         <div style={{
-          position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+          position: "absolute",
+          ...(dropup 
+            ? { bottom: "calc(100% + 4px)", top: "auto" }
+            : { top: "calc(100% + 4px)", bottom: "auto" }),
+          left: 0, right: 0,
           background: "#fff", border: "1px solid var(--border-color)",
           borderRadius: "var(--radius-md)", boxShadow: "0 4px 16px rgba(0,0,0,0.12)",
           maxHeight: "200px", overflowY: "auto", zIndex: 200,
@@ -348,12 +367,12 @@ function EditProfileContent() {
   const [income, setIncome] = useState(user?.income || "");
 
   // § Family
-  const [fatherOcc, setFatherOcc] = useState("");
-  const [motherOcc, setMotherOcc] = useState("");
-  const [familyStatus, setFamilyStatus] = useState("");
-  const [familyType, setFamilyType] = useState("");
-  const [brothers, setBrothers] = useState("0");
-  const [sisters, setSisters] = useState("0");
+  const [fatherOcc, setFatherOcc] = useState(user?.fatherOccupation || "");
+  const [motherOcc, setMotherOcc] = useState(user?.motherOccupation || "");
+  const [familyStatus, setFamilyStatus] = useState(user?.familyStatus || "");
+  const [familyType, setFamilyType] = useState(user?.familyType || "");
+  const [brothers, setBrothers] = useState(String(user?.brothers || 0));
+  const [sisters, setSisters] = useState(String(user?.sisters || 0));
 
   // § Lifestyle
   const [diet, setDiet] = useState(user?.diet || "");
@@ -498,24 +517,30 @@ function EditProfileContent() {
   // ─────────────────────────────────────────────────────────────────────────
 
   // Compute profile completion using the shared utility (consistent across app)
-  // Note: gallery is checked locally since it's not yet saved to DB at this point
-  const pct = (() => {
-    // Use shared utility but override photoUrl with local gallery state
-    const hasPrimaryPhoto = gallery.some(p => p.isPrimary) || !!user?.photoUrl;
-    const fields = [
-      !!firstName.trim(),
-      !!gender,
-      !!dob,
-      !!religion,
-      !!caste,
-      !!education,
-      !!occupation,
-      !!city,
-      !!about,
-      hasPrimaryPhoto,
-    ];
-    return Math.round((fields.filter(Boolean).length / fields.length) * 100);
-  })();
+  const { pct } = computeProfileCompletion({
+    ...user,
+    name: firstName,
+    gender: gender as "male" | "female",
+    dob,
+    religion,
+    caste,
+    education,
+    occupation,
+    city: city || state,
+    about,
+    photoUrl: gallery.some(p => p.isPrimary) ? gallery.find(p => p.isPrimary)?.url : user?.photoUrl,
+    photos: gallery,
+    fatherOccupation: fatherOcc,
+    motherOccupation: motherOcc,
+    familyStatus,
+    familyType,
+    nativePlace,
+    partnerAgeMin: parseInt(pAgeMin) || undefined,
+    partnerAgeMax: parseInt(pAgeMax) || undefined,
+    partnerReligion: pReligion,
+    partnerCaste: pCaste,
+    partnerEducation: pEducation,
+  });
 
   // Caste and Subcaste are now immutable and only displayed.
 

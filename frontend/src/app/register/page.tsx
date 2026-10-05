@@ -2,11 +2,11 @@
 
 import { Suspense, useState, useEffect, useRef } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { ChevronDown, ChevronLeft, Phone, Upload, X, Check, AlertCircle, Mail, Plus } from "lucide-react";
+import { ChevronDown, ChevronLeft, Phone, Upload, X, Check, AlertCircle, Mail, Plus, Info, FileText } from "lucide-react";
 import CompactFooter from "@/components/layout/CompactFooter";
 import toast from "react-hot-toast";
-import { registerUser, saveCompatibilityAnswers } from "@/lib/auth-store";
-import { uploadProfilePhoto } from "@/lib/supabase";
+import { registerUser, saveCompatibilityAnswers, saveHoroscope } from "@/lib/auth-store";
+import { uploadProfilePhoto, uploadHoroscopeFile } from "@/lib/supabase";
 import { useAuth } from "@/context/AuthContext";
 import { useMSG91, CAPTCHA_DIV_ID } from "@/hooks/useMSG91";
 import { validateEmail } from "@/lib/email-validator";
@@ -628,6 +628,7 @@ function RegisterWizard() {
   // ALWAYS start at step 0 so DOB and gender are always collected.
   // Homepage pre-fills name/mobile but DOB/gender still need to be entered.
   const [step, setStep] = useState(0);
+  const [showInvalidEmailModal, setShowInvalidEmailModal] = useState(false);
 
   // Form data — Gender is NEVER pre-filled; user must manually select their own gender
   const [form, setForm] = useState({
@@ -674,6 +675,9 @@ function RegisterWizard() {
   });
   const [showPassword, setShowPassword] = useState(false);
   const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [horoscopeFile, setHoroscopeFile] = useState<File | null>(null);
+  const [horoscopeFileName, setHoroscopeFileName] = useState<string>("");
+  const [horoscopeError, setHoroscopeError] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);  // ← prevents double-submit
 
   // Compatibility answers (step 4)
@@ -828,7 +832,7 @@ function RegisterWizard() {
     if (!emailValidation.valid) {
       const msg = emailValidation.error || "Please enter a valid Gmail address.";
       setFieldError("email", msg);
-      toast.error(msg);
+      setShowInvalidEmailModal(true);
       return;
     }
     setFieldError("email", "");
@@ -894,6 +898,7 @@ function RegisterWizard() {
       const emailValidation = validateEmail(form.email);
       if (!emailValidation.valid) {
         newErrors.email = emailValidation.error || "Please enter a valid Gmail address.";
+        setShowInvalidEmailModal(true);
       } else if (!emailOtpVerified) {
         newErrors.email = "Please verify your email address before continuing.";
       }
@@ -955,6 +960,11 @@ function RegisterWizard() {
       return;
     }
     if (!form.password)               { toast.error("Please set a password"); return; }
+    if (!horoscopeFile) {
+      setHoroscopeError("Please upload your horoscope image to complete registration.");
+      toast.error("Please upload your horoscope image to complete registration.");
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -1009,6 +1019,16 @@ function RegisterWizard() {
         } catch (photoErr) {
           console.warn("Photo upload failed:", photoErr);
           // Non-fatal — user can add photo later
+        }
+      }
+
+      // Upload horoscope to Supabase Storage
+      if (horoscopeFile && newUser.id) {
+        try {
+          const { url, fileName } = await uploadHoroscopeFile(newUser.id, horoscopeFile);
+          await saveHoroscope(newUser.id, url, fileName);
+        } catch (horoscopeErr) {
+          console.warn("Horoscope upload failed:", horoscopeErr);
         }
       }
 
@@ -1068,6 +1088,59 @@ function RegisterWizard() {
           </div>
         </div>
       </header>
+
+      {/* ── INVALID EMAIL MODAL ─────────────────────────────────── */}
+      {showInvalidEmailModal && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 1000,
+            background: "rgba(26,10,14,0.65)",
+            backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: "1rem",
+          }}
+          role="dialog" aria-modal="true" aria-label="Invalid Email Address"
+        >
+          <div
+            style={{
+              background: "#fff",
+              borderRadius: "var(--radius-xl)",
+              padding: "2rem 1.75rem",
+              maxWidth: "380px", width: "100%",
+              boxShadow: "0 20px 60px rgba(107,26,42,0.25)",
+              position: "relative",
+              animation: "slideUp 0.3s ease",
+              textAlign: "center",
+            }}
+          >
+            <button
+              onClick={() => setShowInvalidEmailModal(false)}
+              style={{ position: "absolute", top: "1rem", right: "1rem", background: "none", border: "none", cursor: "pointer", color: "#aaa", padding: "4px" }}
+              aria-label="Close dialog"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+              </svg>
+            </button>
+            <div style={{ marginBottom: "1rem", color: "var(--primary)", display: "flex", justifyContent: "center" }}>
+              <AlertCircle size={40} />
+            </div>
+            <h2 style={{ fontSize: "1.25rem", fontWeight: 800, color: "var(--text-dark)", marginBottom: "0.5rem" }}>
+              Enter a valid Gmail address and verify with Google.
+            </h2>
+            <p style={{ fontSize: "0.875rem", color: "var(--text-medium)", marginBottom: "1.5rem" }}>
+              Please use a valid @gmail.com email address to continue.
+            </p>
+            <button
+              onClick={() => setShowInvalidEmailModal(false)}
+              className="btn btn-primary"
+              style={{ width: "100%", justifyContent: "center" }}
+            >
+              Okay
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* ── OTP VERIFICATION MODAL ─────────────────────────────────── */}
       {otpModalOpen && (
@@ -1960,98 +2033,6 @@ function RegisterWizard() {
           </div>
         )}
 
-        {/* ===== STEP 4: Compatibility Questions — REMOVED (now post-registration) ===== */}
-        {false && step === 4 && (() => {
-          const categories = Array.from(new Set(COMPATIBILITY_QUESTIONS.map(q => q.category)));
-          const answeredCount = Object.keys(compatAnswers).length;
-          const totalQ = COMPATIBILITY_QUESTIONS.length;
-          return (
-            <div className="animate-fade-in-up">
-              <StepProgressBar step={5} total={6} />
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "1.5rem" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-                  <button onClick={() => setStep(3)} style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "var(--text-dark)", display: "flex" }}>
-                    <ChevronLeft size={20} />
-                  </button>
-                  <div>
-                    <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--text-dark)", margin: 0 }}>Compatibility Questions</h2>
-                    <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", margin: "2px 0 0" }}>{answeredCount}/{totalQ} answered</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setStep(5)}
-                  style={{ display: "flex", alignItems: "center", gap: "4px", background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontWeight: 700, fontSize: "0.875rem", fontFamily: "var(--font-sans)" }}
-                >
-                  Skip
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
-                </button>
-              </div>
-
-              <div className="register-card" style={{ background: "#fff", border: "1px solid var(--border-color)", borderRadius: "var(--radius-xl)", padding: "1.5rem" }}>
-                <p style={{ fontSize: "0.8125rem", color: "var(--text-muted)", marginBottom: "1.5rem", lineHeight: 1.6 }}>
-                  These 21 questions help us calculate a compatibility score between you and potential matches. Answers are private — only the score is shared.
-                </p>
-
-                {categories.map(category => (
-                  <div key={category} style={{ marginBottom: "1.75rem" }}>
-                    <h3 style={{ fontSize: "0.8125rem", fontWeight: 700, color: "var(--primary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "1rem", paddingBottom: "0.5rem", borderBottom: "1px solid var(--border-light)" }}>
-                      {category}
-                    </h3>
-                    {COMPATIBILITY_QUESTIONS.filter(q => q.category === category).map(q => (
-                      <div key={q.id} style={{ marginBottom: "1.25rem" }}>
-                        <label style={{ display: "block", fontWeight: 600, fontSize: "0.9rem", color: "var(--text-dark)", marginBottom: "0.625rem", lineHeight: 1.45 }}>
-                          {q.question}
-                        </label>
-                        <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                          {q.options.map(opt => {
-                            const selected = compatAnswers[q.id] === opt.value;
-                            return (
-                              <button
-                                key={opt.value}
-                                type="button"
-                                onClick={() => setCompatAnswers(prev => ({ ...prev, [q.id]: opt.value }))}
-                                style={{
-                                  padding: "0.4rem 0.875rem",
-                                  borderRadius: "var(--radius-full)",
-                                  border: `1.5px solid ${selected ? "var(--primary)" : "var(--border-color)"}`,
-                                  background: selected ? "var(--primary)" : "#fff",
-                                  color: selected ? "#fff" : "var(--text-dark)",
-                                  fontWeight: selected ? 700 : 400,
-                                  fontSize: "0.8125rem",
-                                  cursor: "pointer",
-                                  fontFamily: "var(--font-sans)",
-                                  transition: "all 0.15s ease",
-                                }}
-                              >
-                                {opt.label}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ))}
-
-                {answeredCount > 0 && answeredCount < totalQ && (
-                  <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginBottom: "1rem" }}>
-                    {totalQ - answeredCount} question{totalQ - answeredCount !== 1 ? "s" : ""} unanswered — you can still continue.
-                  </p>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => setStep(5)}
-                  className="btn btn-primary"
-                  style={{ width: "100%", justifyContent: "center", marginTop: "0.5rem" }}
-                >
-                  {answeredCount > 0 ? `Save & Continue (${answeredCount}/${totalQ} answered)` : "Skip for now"}
-                </button>
-              </div>
-            </div>
-          );
-        })()}
-
         {/* ===== STEP 4: Add Photo ===== */}
 
         {step === 4 && (
@@ -2069,7 +2050,7 @@ function RegisterWizard() {
                 onClick={() => { setStep(5); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                 style={{ display: "flex", alignItems: "center", gap: "4px", background: "none", border: "none", cursor: "pointer", color: "var(--primary)", fontWeight: 700, fontSize: "0.875rem", fontFamily: "var(--font-sans)" }}
               >
-                Skip
+                Continue Without Photo
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><polyline points="9 18 15 12 9 6"/></svg>
               </button>
             </div>
@@ -2097,7 +2078,7 @@ function RegisterWizard() {
                     <>
                       <img src={form.photoUrl} alt="Profile" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                       <button
-                        onClick={(e) => { e.preventDefault(); set("photoUrl", "") }}
+                        onClick={(e) => { e.preventDefault(); set("photoUrl", ""); setPhotoFile(null); }}
                         style={{ position: "absolute", top: "4px", right: "4px", background: "rgba(0,0,0,0.5)", border: "none", borderRadius: "50%", width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, color: "#fff" }}
                       >
                         <X size={12} />
@@ -2158,13 +2139,38 @@ function RegisterWizard() {
                 className="btn btn-primary"
                 style={{ width: "100%", justifyContent: "center", marginTop: "0.75rem" }}
               >
-                {form.photoUrl ? "Save & Continue" : "Continue without photo"}
+                {form.photoUrl ? "Save & Continue" : "Continue Without Photo"}
               </button>
+
+              {form.photoUrl && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    set("photoUrl", "");
+                    setPhotoFile(null);
+                    setStep(5);
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                  }}
+                  style={{
+                    width: "100%",
+                    background: "none",
+                    border: "none",
+                    color: "var(--text-medium)",
+                    fontSize: "0.875rem",
+                    fontWeight: 600,
+                    marginTop: "0.75rem",
+                    cursor: "pointer",
+                    textDecoration: "underline",
+                  }}
+                >
+                  Continue Without Photo
+                </button>
+              )}
             </div>
           </div>
         )}
 
-        {/* ===== STEP 5: About Me ===== */}
+        {/* ===== STEP 5: Horoscope & About Me ===== */}
         {step === 5 && (
           <div className="animate-fade-in-up">
             <StepProgressBar step={6} total={6} />
@@ -2172,10 +2178,98 @@ function RegisterWizard() {
               <button onClick={() => setStep(4)} aria-label="Go back" style={{ background: "none", border: "none", cursor: "pointer", padding: "4px", color: "var(--text-dark)", display: "flex" }}>
                 <ChevronLeft size={20} />
               </button>
-              <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--text-dark)", margin: 0 }}>About You</h2>
+              <h2 style={{ fontSize: "1.125rem", fontWeight: 700, color: "var(--text-dark)", margin: 0 }}>Horoscope &amp; About You</h2>
             </div>
 
             <div className="register-card" style={{ background: "#fff", border: "1px solid var(--border-color)", borderRadius: "var(--radius-xl)", padding: "1.75rem" }}>
+              {/* ── MANDATORY HOROSCOPE UPLOAD SECTION ── */}
+              <div style={{ marginBottom: "1.75rem", paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-light)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "0.625rem" }}>
+                  <label style={{ fontWeight: 700, fontSize: "0.9375rem", color: "var(--text-dark)", margin: 0 }}>
+                    Upload Horoscope
+                  </label>
+                  <span
+                    title="Upload PDF or JPG format of your horoscope (jathagam)"
+                    style={{ cursor: "pointer", color: "#8E8E93", display: "inline-flex", alignItems: "center" }}
+                  >
+                    <Info size={16} />
+                  </span>
+                </div>
+
+                <label
+                  htmlFor="horoscope-file-input"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minHeight: "56px",
+                    padding: "0.875rem 1.25rem",
+                    borderRadius: "var(--radius-md)",
+                    border: `1.5px dashed ${horoscopeError ? "#D32F2F" : horoscopeFile ? "var(--primary)" : "#E4C5B9"}`,
+                    background: horoscopeFile ? "var(--primary-light)" : "#FFFDFB",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                >
+                  {horoscopeFile ? (
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", width: "100%" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                        <FileText size={22} style={{ color: "var(--primary)" }} />
+                        <div>
+                          <p style={{ margin: 0, fontWeight: 700, fontSize: "0.875rem", color: "var(--text-dark)" }}>
+                            {horoscopeFileName || horoscopeFile.name}
+                          </p>
+                          <p style={{ margin: 0, fontSize: "0.75rem", color: "var(--success)", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
+                            <Check size={13} /> Horoscope attached successfully
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setHoroscopeFile(null);
+                          setHoroscopeFileName("");
+                        }}
+                        style={{ background: "none", border: "none", cursor: "pointer", color: "#888", padding: "4px" }}
+                      >
+                        <X size={18} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: "8px", color: "#4A2027" }}>
+                      <Upload size={18} />
+                      <span style={{ fontWeight: 600, fontSize: "0.9375rem" }}>Upload Horoscope (PDF/JPG)</span>
+                    </div>
+                  )}
+                </label>
+
+                <input
+                  id="horoscope-file-input"
+                  type="file"
+                  accept="image/*,.pdf"
+                  style={{ display: "none" }}
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      setHoroscopeFile(file);
+                      setHoroscopeFileName(file.name);
+                      setHoroscopeError("");
+                      toast.success("Horoscope attached!");
+                    }
+                  }}
+                />
+
+                {horoscopeError && <FieldError msg={horoscopeError} />}
+                {!horoscopeFile && !horoscopeError && (
+                  <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.375rem", marginBottom: 0 }}>
+                    Registration will be completed only after uploading your horoscope image.
+                  </p>
+                )}
+              </div>
+
+              {/* ── ABOUT YOU SECTION ── */}
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.875rem" }}>
                 <h3 style={{ fontWeight: 700, fontSize: "1.0625rem", color: "var(--text-dark)", margin: 0 }}>
                   Write a few words about yourself

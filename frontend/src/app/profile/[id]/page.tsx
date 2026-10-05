@@ -7,7 +7,7 @@ import CompactFooter from "@/components/layout/CompactFooter";
 import { MOCK_PROFILES, MOCK_GROOM_PROFILES } from "@/data/mock-profiles";
 import { Heart, BookmarkPlus, MessageCircle, Phone, ArrowLeft, ChevronRight, Edit2, CheckCircle, Camera, UserCircle, Briefcase, Star, FileText, MapPin, Crown, Lock } from "lucide-react";
 import toast from "react-hot-toast";
-import { getUserById, sendInterestWithNotification, getInterestStatus, shortlistProfileWithNotification, recordProfileViewWithNotification } from "@/lib/auth-store";
+import { getUserById, sendInterestWithNotification, getInterestStatus, shortlistProfileWithNotification, recordProfileViewWithNotification, computeProfileCompletion } from "@/lib/auth-store";
 import { useAuth } from "@/context/AuthContext";
 import { useMembership } from "@/hooks/useMembership";
 import { ProfileViewSkeleton } from "@/components/ui/Skeleton";
@@ -258,6 +258,9 @@ function OwnProfileFallback({ id }: { id: string }) {
                 <>
                   {/* Profile completion — specific missing fields */}
                   {(() => {
+                    const { pct } = computeProfileCompletion(storeUser);
+                    if (pct >= 100) return null;
+
                     const missing: { label: string; section: string; icon: React.ReactNode }[] = [];
                     if (!storeUser.photoUrl) missing.push({ label: "Add Photo", section: "photo", icon: <Camera size={14} /> });
                     if (!storeUser.education && !storeUser.occupation) missing.push({ label: "Professional Details", section: "professional", icon: <Briefcase size={14} /> });
@@ -266,10 +269,6 @@ function OwnProfileFallback({ id }: { id: string }) {
                     if (!storeUser.city) missing.push({ label: "Location", section: "location", icon: <MapPin size={14} /> });
                     const hasSavedPartnerPrefs = !!(storeUser.partnerReligion || storeUser.partnerCaste || storeUser.partnerEducation || storeUser.partnerOccupation || storeUser.partnerHeightMin || (storeUser.partnerAgeMin && storeUser.partnerAgeMin !== 22));
                     if (!hasSavedPartnerPrefs) missing.push({ label: "Partner Preferences", section: "partner", icon: <Heart size={14} /> });
-
-                    const totalFields = 10;
-                    const filled = totalFields - missing.length;
-                    const pct = Math.round((filled / totalFields) * 100);
 
                     if (missing.length === 0) return null;
                     return (

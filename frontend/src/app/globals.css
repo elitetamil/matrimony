@@ -428,17 +428,16 @@ h1, h2, .section-title, .text-display {
 
 .form-select {
   width: 100%;
-  padding: 0.75rem 2.25rem 0.75rem 1rem;
+  padding: 0.75rem 1rem;
   border: 1.5px solid var(--border-color);
   border-radius: var(--radius-md);
   font-size: 1rem;
   /* Prevents iOS zoom */
   font-family: var(--font-sans);
   color: var(--text-dark);
-  background: var(--bg-white) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23757575' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E") no-repeat right 0.75rem center;
-  background-size: 14px;
-  appearance: none;
-  -webkit-appearance: none;
+  background: var(--bg-white);
+  appearance: auto;
+  -webkit-appearance: menulist;
   cursor: pointer;
   outline: none;
   line-height: 1.5;
@@ -2478,20 +2477,21 @@ select {
 /* ============================================================
    PROFILE CARD LAYOUT
    ============================================================ */
-/* Smallest screens: horizontal split mini card */
+/* Smallest screens: vertical stacked card */
 @media (max-width: 479px) {
   .match-card-grid {
-    display: grid !important;
-    grid-template-columns: 140px 1fr !important;
-    grid-template-areas: "photo info" "actions actions" !important;
+    display: flex !important;
+    flex-direction: column !important;
   }
 
   .match-card-photo-wrap {
-    width: 140px !important;
+    width: 100% !important;
     aspect-ratio: unset !important;
-    max-height: 220px !important;
-    min-height: 180px !important;
+    height: 280px !important;
+    max-height: 280px !important;
+    min-height: 280px !important;
     overflow: hidden !important;
+    border-bottom: 1px solid #e8e8e8;
   }
 
   .match-card-photo {
@@ -2499,8 +2499,8 @@ select {
     height: 100% !important;
     object-fit: cover !important;
     object-position: top center !important;
-    min-height: 180px !important;
-    max-height: 220px !important;
+    min-height: 280px !important;
+    max-height: 280px !important;
   }
 }
 
