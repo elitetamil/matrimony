@@ -640,6 +640,7 @@ function RegisterWizard() {
     dobMonth: "",
     dobYear: "",
     gender: "", // Unselected by default — user selects Male or Female manually
+    partnerGender: initPartnerGender, // Initialized from Landing Page
     password: "",
     email: initEmail, // prefilled when coming from login "Create Account"
     // Step 1
@@ -661,7 +662,6 @@ function RegisterWizard() {
     rasi: "",
     dhosham: "",
     // Step 3 — Partner Preferences (preserved from landing page search)
-    partnerGender: initPartnerGender,
     partnerAgeMin: initPartnerAgeMin as number | undefined,
     partnerAgeMax: initPartnerAgeMax as number | undefined,
     partnerReligion: initReligion,
@@ -890,6 +890,7 @@ function RegisterWizard() {
     const dobErr = validateDob(form.dob);
     if (dobErr) newErrors.dob = dobErr;
     if (!form.gender) newErrors.gender = "Please select your gender.";
+    if (!form.partnerGender) newErrors.partnerGender = "Please select who you are looking for.";
     if (!otpVerified) newErrors.otp = "Please verify your mobile number.";
     // Email is mandatory
     if (!form.email.trim()) {
@@ -995,6 +996,7 @@ function RegisterWizard() {
         about: form.about,
         photoUrl: form.photoUrl || undefined,
         // Partner preferences
+        partnerGender: form.partnerGender,
         partnerAgeMin: form.partnerAgeMin || undefined,
         partnerAgeMax: form.partnerAgeMax || undefined,
         partnerReligion: form.partnerReligion && form.partnerReligion !== "Any" ? form.partnerReligion : undefined,
@@ -1346,7 +1348,7 @@ function RegisterWizard() {
               {/* Gender */}
               <div style={{ marginBottom: "1.25rem" }}>
                 <PillGroup
-                  label="Gender"
+                  label="Profile Gender"
                   options={["Male", "Female"]}
                   value={form.gender === "male" ? "Male" : form.gender === "female" ? "Female" : ""}
                   onChange={(v) => {
@@ -1356,6 +1358,21 @@ function RegisterWizard() {
                   required
                 />
                 <FieldError msg={fieldErrors.gender} />
+              </div>
+
+              {/* Looking For (Partner Gender) */}
+              <div style={{ marginBottom: "1.25rem" }}>
+                <PillGroup
+                  label="Looking For"
+                  options={["Male", "Female"]}
+                  value={form.partnerGender === "male" ? "Male" : form.partnerGender === "female" ? "Female" : ""}
+                  onChange={(v) => {
+                    set("partnerGender", v.toLowerCase());
+                    clearFieldError("partnerGender");
+                  }}
+                  required
+                />
+                <FieldError msg={fieldErrors.partnerGender} />
               </div>
 
               {/* Date of Birth — three dropdowns with leap year support */}

@@ -142,6 +142,7 @@ function ShortlistedContent() {
             </div>
           ) : (
             <div
+              className="shortlisted-grid"
               style={{
                 display: "grid",
                 gridTemplateColumns: "repeat(2, 1fr)",

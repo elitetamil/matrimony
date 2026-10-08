@@ -394,6 +394,7 @@ function EditProfileContent() {
   const [about, setAbout] = useState(user?.about || "");
 
   // § Partner
+  const [pGender, setPGender] = useState(user?.partnerGender || "");
   const [pAgeMin, setPAgeMin] = useState(String(user?.partnerAgeMin || 22));
   const [pAgeMax, setPAgeMax] = useState(String(user?.partnerAgeMax || 35));
   const [pReligion, setPReligion] = useState(user?.partnerReligion || "");
@@ -417,7 +418,7 @@ function EditProfileContent() {
     religion, caste, subCaste, gothram, star, rasi, dhosham, timeOfBirth, education, college,
     occupation, company, employmentType, income, diet, smoking, drinking, disabilities,
     languages, hobbies, interests, country, state, city, nativePlace, about,
-    pAgeMin, pAgeMax, pReligion, pCaste, pEducation, pOccupation,
+    pGender, pAgeMin, pAgeMax, pReligion, pCaste, pEducation, pOccupation,
     pIncome, pHeightMin, pHeightMax, pCountry, pMaritalStatus, pMotherTongue,
     fatherOcc, motherOcc, familyStatus, familyType, brothers, sisters
   });
@@ -494,6 +495,7 @@ function EditProfileContent() {
     setAbout(user.about || "");
 
     // Partner Preferences
+    setPGender(user.partnerGender || "");
     setPAgeMin(String(user.partnerAgeMin ?? 22));
     setPAgeMax(String(user.partnerAgeMax ?? 35));
     setPReligion(user.partnerReligion || "");
@@ -535,6 +537,7 @@ function EditProfileContent() {
     familyStatus,
     familyType,
     nativePlace,
+    partnerGender: pGender,
     partnerAgeMin: parseInt(pAgeMin) || undefined,
     partnerAgeMax: parseInt(pAgeMax) || undefined,
     partnerReligion: pReligion,
@@ -662,6 +665,7 @@ function EditProfileContent() {
           city,
           nativePlace,
           about,
+          partnerGender: pGender || undefined,
           partnerAgeMin: parseInt(pAgeMin),
           partnerAgeMax: parseInt(pAgeMax),
           partnerReligion: pReligion || undefined,
@@ -1214,6 +1218,22 @@ function EditProfileContent() {
                 </div>
 
                 <FieldGrid>
+                  {/* Partner Gender */}
+                  <FormField label="Gender">
+                    <SearchableSelect
+                      label="Gender"
+                      hideLabel
+                      value={pGender}
+                      onChange={setPGender}
+                      options={[
+                        { value: "male", label: "Male" },
+                        { value: "female", label: "Female" },
+                        { value: "any", label: "Any" },
+                      ]}
+                      placeholder="Select gender"
+                    />
+                  </FormField>
+
                   {/* Age Range */}
                   <FormField label="Age Range">
                     <div style={{ display: "flex", gap: "0.625rem", alignItems: "center" }}>

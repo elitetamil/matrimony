@@ -129,6 +129,7 @@ function ReceivedCard({
 
   return (
     <div
+      className="interest-card"
       style={{
         background: "#fff",
         border: "1px solid #e0e0e0",
@@ -307,6 +308,7 @@ function SentCard({
 
   return (
     <div
+      className="interest-card"
       style={{
         background: "#fff",
         border: "1px solid #e0e0e0",
@@ -703,6 +705,18 @@ function InterestsContent() {
             box-shadow: 4px 0 20px rgba(0,0,0,0.15) !important;
             transform: ${sidebarOpen ? 'translateX(0)' : 'translateX(-100%)'} !important;
             transition: transform 0.25s ease !important;
+          }
+          @media (max-width: 480px) {
+            .interest-card {
+              flex-direction: column !important;
+            }
+            .interest-card > a {
+              width: 100% !important;
+            }
+            .interest-card img {
+              width: 100% !important;
+              height: 240px !important;
+            }
           }
         }
       `}</style>

@@ -733,12 +733,24 @@ function AuthenticatedDashboard() {
           display: flex;
           gap: 1rem;
           align-items: flex-start;
+          flex-direction: column; /* Mobile first */
+        }
+        @media (min-width: 1024px) {
+          .dashboard-container {
+            flex-direction: row;
+          }
         }
         .dash-left-sidebar {
-          width: 235px;
+          width: 100%;
           flex-shrink: 0;
-          position: sticky;
-          top: 80px;
+          position: static;
+        }
+        @media (min-width: 1024px) {
+          .dash-left-sidebar {
+            width: 235px;
+            position: sticky;
+            top: 80px;
+          }
         }
         .dash-center-main {
           flex: 1;
@@ -746,23 +758,44 @@ function AuthenticatedDashboard() {
           display: flex;
           flex-direction: column;
           gap: 1rem;
+          width: 100%;
         }
         .dash-right-sidebar {
-          width: 275px;
+          width: 100%;
           flex-shrink: 0;
           display: flex;
           flex-direction: column;
           gap: 1rem;
         }
+        @media (min-width: 1024px) {
+          .dash-right-sidebar {
+            width: 275px;
+          }
+        }
         .stat-cards-grid {
           display: grid;
-          grid-template-columns: repeat(5, 1fr);
+          grid-template-columns: repeat(2, 1fr);
           gap: 0.625rem;
+        }
+        @media (min-width: 600px) {
+          .stat-cards-grid {
+            grid-template-columns: repeat(3, 1fr);
+          }
+        }
+        @media (min-width: 1024px) {
+          .stat-cards-grid {
+            grid-template-columns: repeat(5, 1fr);
+          }
         }
         .two-column-split {
           display: grid;
-          grid-template-columns: 1.15fr 1fr;
+          grid-template-columns: 1fr;
           gap: 1rem;
+        }
+        @media (min-width: 768px) {
+          .two-column-split {
+            grid-template-columns: 1.15fr 1fr;
+          }
         }
         .recs-carousel-track::-webkit-scrollbar {
           display: none;
@@ -2382,15 +2415,18 @@ export default function HomePage() {
               <h1
                 style={{
                   fontFamily: "var(--font-heading)",
-                  fontSize: "clamp(2.5rem, 5.5vw, 4.25rem)",
+                  fontSize: "clamp(1.2rem, 4.2vw, 4.25rem)",
                   fontWeight: 700,
                   lineHeight: 1.15,
                   letterSpacing: "-0.01em",
                   margin: "0 0 1rem 0",
                   textShadow: "0 2px 10px rgba(0, 0, 0, 0.55), 0 1px 3px rgba(0, 0, 0, 0.7)",
+                  whiteSpace: "nowrap",
                 }}
               >
-                <span style={{ color: "#FFFDF8", whiteSpace: "nowrap" }}>Tradition Meets <span style={{ color: "var(--gold-light)" }}>True Connections</span></span>
+                <span style={{ color: "#FFFDF8" }}>
+                  Tradition Meets <span style={{ color: "var(--gold-light)" }}>True Connections</span>
+                </span>
               </h1>
 
               <p
@@ -2411,6 +2447,7 @@ export default function HomePage() {
 
             {/* HORIZONTAL SEARCH FORM (Integrated into existing Hero) */}
             <div
+              className="hero-search-wrapper"
               style={{
                 position: "relative",
                 zIndex: 10,
@@ -2703,6 +2740,18 @@ export default function HomePage() {
               @media (min-width: 992px) {
                 .love-story-grid {
                   grid-template-columns: 1fr 1.3fr !important;
+                }
+              }
+              @media (max-width: 768px) {
+                .hero-search-wrapper {
+                  transform: translateY(-2rem) !important;
+                  padding: 1rem !important;
+                }
+              }
+              @media (max-width: 480px) {
+                .hero-search-wrapper {
+                  transform: translateY(0) !important;
+                  margin-top: 2rem;
                 }
               }
             `}</style>

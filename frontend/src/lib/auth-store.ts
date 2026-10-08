@@ -62,6 +62,7 @@ export interface RegisteredUser {
   photoUrl?: string;
   isVerified?: boolean;
   isPremium?: boolean;
+  partnerGender?: string;
   partnerAgeMin?: number;
   partnerAgeMax?: number;
   partnerReligion?: string;
@@ -153,6 +154,7 @@ function dbToUser(row: Record<string, any>): RegisteredUser {
     isPremium: row.is_premium ?? false,
     // Compute age from DOB
     age: row.dob ? Math.floor((Date.now() - new Date(row.dob).getTime()) / (365.25 * 24 * 3600 * 1000)) : undefined,
+    partnerGender: row.partner_gender ?? undefined,
     partnerAgeMin: row.partner_age_min ?? undefined,
     partnerAgeMax: row.partner_age_max ?? undefined,
     partnerReligion: row.partner_religion ?? undefined,
@@ -241,6 +243,7 @@ function userToDb(data: Partial<RegisteredUser>): Record<string, unknown> {
   set('time_of_birth', data.timeOfBirth);
   set('about',         data.about);
   set('photo_url',     data.photoUrl);
+  set('partner_gender',         data.partnerGender);
   set('partner_religion',       data.partnerReligion);
   set('partner_caste',          data.partnerCaste);
   set('partner_education',      data.partnerEducation);
@@ -414,6 +417,7 @@ export async function registerUser(payload: RegisterPayload): Promise<Registered
     motherOccupation: payload.motherOccupation,
     hobbies: payload.hobbies,
     interests: payload.interests,
+    partnerGender: payload.partnerGender,
     partnerAgeMin: payload.partnerAgeMin,
     partnerAgeMax: payload.partnerAgeMax,
     partnerReligion: payload.partnerReligion,
@@ -1069,7 +1073,9 @@ export async function fetchMatchProfiles(
   }
 
   const normalizedGender = currentUserGender?.toLowerCase();
-  const oppositeGender = normalizedGender === 'male' ? 'female'
+  const oppositeGender = currentUser?.partnerGender 
+    ? currentUser.partnerGender.toLowerCase() 
+    : normalizedGender === 'male' ? 'female'
     : normalizedGender === 'female' ? 'male'
     : null;
 
@@ -1897,7 +1903,7 @@ export async function getSimilarHobbies(
 export async function getMutualMatches(
   currentUser: RegisteredUser
 ): Promise<RegisteredUser[]> {
-  const oppositeGender = currentUser.gender === 'male' ? 'female' : 'male';
+  const oppositeGender = currentUser.partnerGender ? currentUser.partnerGender.toLowerCase() : currentUser.gender === 'male' ? 'female' : 'male';
 
   const { data } = await supabase
     .from('profiles')
@@ -1952,7 +1958,7 @@ export async function getMutualMatches(
 export async function getLookingForMe(
   currentUser: RegisteredUser
 ): Promise<RegisteredUser[]> {
-  const oppositeGender = currentUser.gender === 'male' ? 'female' : 'male';
+  const oppositeGender = currentUser.partnerGender ? currentUser.partnerGender.toLowerCase() : currentUser.gender === 'male' ? 'female' : 'male';
 
   const { data } = await supabase
     .from('profiles')

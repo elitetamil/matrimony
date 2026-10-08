@@ -539,19 +539,7 @@ function MatchesContent({ user, canMessage, canViewContact, initialTab, isPremiu
     <>
       <Navbar />
       <main style={{ background: "#f2f2f2", height: "calc(100vh - 64px)", overflow: "hidden", display: "flex", flexDirection: "column" }} className="matches-main-content">
-        <div
-          style={{
-            maxWidth: "1100px",
-            width: "100%",
-            margin: "0 auto",
-            padding: "0.75rem",
-            display: "flex",
-            gap: "1rem",
-            alignItems: "stretch",
-            flex: 1,
-            overflow: "hidden",
-          }}
-        >
+        <div className="matches-layout-container">
 
           {/* ── MOBILE SIDEBAR OVERLAY ── */}
           {sidebarOpen && (
@@ -565,23 +553,7 @@ function MatchesContent({ user, canMessage, canViewContact, initialTab, isPremiu
           )}
 
           {/* ── SIDEBAR ─────────────────────────────────────────────────── */}
-            <aside
-              className="matches-sidebar-panel"
-              style={{
-                width: "268px",
-                flexShrink: 0,
-                background: "#fff",
-                border: "1px solid #e0e0e0",
-                borderRadius: "6px",
-                overflowY: "auto",
-                overscrollBehavior: "contain",
-                alignSelf: "flex-start",
-                position: "sticky",
-                top: 0,
-                height: "100%",
-                maxHeight: "100%",
-              }}
-            >
+            <aside className={`matches-sidebar-panel ${sidebarOpen ? 'mobile-open' : ''}`}>
             {/* "All Matches" header */}
             <div
               style={{
@@ -1113,6 +1085,51 @@ function MatchesContent({ user, canMessage, canViewContact, initialTab, isPremiu
         @media (max-width: 899px) {
           .matches-main-content {
             height: calc(100vh - 64px - 60px - env(safe-area-inset-bottom, 0px)) !important;
+          }
+        }
+        .matches-layout-container {
+          max-width: 1100px;
+          width: 100%;
+          margin: 0 auto;
+          padding: 0.75rem;
+          display: flex;
+          gap: 1rem;
+          align-items: stretch;
+          flex: 1;
+          overflow: hidden;
+          position: relative;
+        }
+        .matches-sidebar-panel {
+          width: 268px;
+          flex-shrink: 0;
+          background: #fff;
+          border: 1px solid #e0e0e0;
+          border-radius: 6px;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+          align-self: flex-start;
+          position: sticky;
+          top: 0;
+          height: 100%;
+          max-height: 100%;
+          z-index: 10;
+        }
+        @media (max-width: 900px) {
+          .matches-sidebar-panel {
+            position: fixed;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            height: 100vh;
+            max-height: 100vh;
+            z-index: 160;
+            transform: translateX(-100%);
+            transition: transform 0.3s ease;
+            box-shadow: 4px 0 24px rgba(0,0,0,0.15);
+            border-radius: 0;
+          }
+          .matches-sidebar-panel.mobile-open {
+            transform: translateX(0);
           }
         }
       `}</style>

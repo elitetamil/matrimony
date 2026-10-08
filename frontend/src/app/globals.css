@@ -1029,8 +1029,9 @@ h1, h2, .section-title, .text-display {
     display: flex;
   }
 
+  /* .bottom-nav-spacer is disabled here because body:has(.bottom-nav) handles the padding */
   .bottom-nav-spacer {
-    display: block;
+    display: none !important;
   }
 
   body:has(.bottom-nav) {

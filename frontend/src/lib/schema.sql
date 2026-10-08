@@ -61,6 +61,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   family_type            TEXT,
   brothers               INT DEFAULT 0,
   sisters                INT DEFAULT 0,
+  partner_gender         TEXT CHECK (partner_gender IN ('male', 'female', 'any')),
   partner_age_min        INT DEFAULT 22,
   partner_age_max        INT DEFAULT 35,
   partner_religion       TEXT,
@@ -85,6 +86,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 
 -- Ensure all columns exist on pre-existing tables
 ALTER TABLE public.profiles
+  ADD COLUMN IF NOT EXISTS partner_gender         TEXT CHECK (partner_gender IN ('male', 'female', 'any')),
   ADD COLUMN IF NOT EXISTS auth_email             TEXT,
   ADD COLUMN IF NOT EXISTS is_premium             BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS membership_plan        TEXT CHECK (membership_plan IN ('Gold','Diamond','Platinum')),
