@@ -61,7 +61,7 @@ const sections: Section[] = [
           <li><strong>Photos and Media:</strong> Profile photographs and additional gallery images you upload</li>
           <li><strong>About Me:</strong> Any free-text biography or description you write</li>
           <li><strong>Authentication Credentials:</strong> Password (stored as a salted hash — never in plain text), OTP verification records</li>
-          <li><strong>Payment Information:</strong> Membership plan selected, amount paid; we do NOT store your card/bank details — these are processed by our payment partner (Razorpay)</li>
+          <li><strong>Payment Information:</strong> Membership plan selected, amount paid; we do NOT store your card/bank details — these are processed by our payment partner (Cashfree)</li>
         </ul>
 
         <h4>2.2 Information Collected Automatically</h4>
@@ -78,7 +78,7 @@ const sections: Section[] = [
         <ul>
           <li><strong>MSG91 (SMS OTP Provider):</strong> OTP delivery status, mobile verification confirmation</li>
           <li><strong>Resend (Email OTP Provider):</strong> Email delivery status, bounce information</li>
-          <li><strong>Razorpay (Payment Gateway):</strong> Payment status, transaction reference ID</li>
+          <li><strong>Cashfree (Payment Gateway):</strong> Payment status, transaction reference ID</li>
           <li><strong>Supabase (Database &amp; Auth Provider):</strong> Authentication events, session metadata</li>
         </ul>
       </>
@@ -125,7 +125,7 @@ const sections: Section[] = [
               <li>Supabase Inc. — Database, authentication, and file storage</li>
               <li>MSG91 — SMS OTP delivery</li>
               <li>Resend — Transactional email delivery</li>
-              <li>Razorpay — Payment processing</li>
+              <li>Cashfree — Payment processing</li>
               <li>Cloudflare — CDN and DDoS protection</li>
             </ul>
             These vendors process data only as instructed by us and are bound by confidentiality obligations.
@@ -353,7 +353,7 @@ const sections: Section[] = [
 
         <h4>9.6 Third-Party Services</h4>
         <p>
-          Our Platform integrates third-party services (Razorpay, MSG91, Resend, Supabase, Cloudflare). We are not
+          Our Platform integrates third-party services (Cashfree, MSG91, Resend, Supabase, Cloudflare). We are not
           responsible for any failures, outages, data breaches, or misconduct by these third-party services. Their
           own privacy policies and terms govern your interactions with them.
         </p>

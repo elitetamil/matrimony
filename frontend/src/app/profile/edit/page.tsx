@@ -9,11 +9,16 @@ import {
   Camera, Upload, Trash2, Check, ChevronRight, ChevronDown,
   User, BookOpen, Briefcase, Users, Leaf, MapPin, FileText,
   Heart, Info, Save, Eye, X, Plus, ArrowLeft, CheckCircle2,
+  ExternalLink, RefreshCw,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import { useAuth } from "@/context/AuthContext";
-import { updateProfile, addProfilePhoto, deleteProfilePhoto, setProfilePhotoPrimary, type ProfilePhoto, computeProfileCompletion } from "@/lib/auth-store";
-import { uploadProfilePhoto } from "@/lib/supabase";
+import {
+  updateProfile, addProfilePhoto, deleteProfilePhoto, setProfilePhotoPrimary,
+  type ProfilePhoto, computeProfileCompletion,
+  getHoroscope, saveHoroscope, deleteHoroscope, type UserHoroscope,
+} from "@/lib/auth-store";
+import { uploadProfilePhoto, uploadHoroscopeFile, deleteHoroscopeFile } from "@/lib/supabase";
 import Link from "next/link";
 import {
   RELIGIONS, MARITAL_STATUS, MOTHER_TONGUES, EDUCATION_LEVELS,
@@ -413,6 +418,12 @@ function EditProfileContent() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [pendingNav, setPendingNav] = useState<(() => void) | null>(null);
 
+  // Horoscope state
+  const [horoscope, setHoroscope] = useState<UserHoroscope | null>(user?.horoscope || null);
+  const [horoscopeSignedUrl, setHoroscopeSignedUrl] = useState<string | null>(user?.horoscope?.signedUrl || null);
+  const [uploadingHoroscope, setUploadingHoroscope] = useState(false);
+  const horoscopeInputRef = useRef<HTMLInputElement>(null);
+
   const currentFormState = JSON.stringify({
     firstName, lastName, gender, dob, height, weight, bodyType, physicalStatus, maritalStatus, motherTongue,
     religion, caste, subCaste, gothram, star, rasi, dhosham, timeOfBirth, education, college,
@@ -511,6 +522,27 @@ function EditProfileContent() {
 
     // Gallery
     if (user.photos?.length) setGallery(user.photos);
+
+    // Horoscope
+    if (user.horoscope) {
+      setHoroscope(user.horoscope);
+      if (user.horoscope.signedUrl) {
+        setHoroscopeSignedUrl(user.horoscope.signedUrl);
+      } else if (user.horoscope.fileUrl) {
+        import("@/lib/supabase").then(({ getHoroscopeSignedUrl }) => {
+          getHoroscopeSignedUrl(user.horoscope!.fileUrl, 3600)
+            .then(url => setHoroscopeSignedUrl(url))
+            .catch(() => {});
+        });
+      }
+    } else {
+      getHoroscope(user.id).then((h) => {
+        if (h) {
+          setHoroscope(h);
+          if (h.signedUrl) setHoroscopeSignedUrl(h.signedUrl);
+        }
+      }).catch((e) => console.warn("Could not load horoscope:", e));
+    }
 
     setTimeout(() => {
       setInitialStateHash(currentFormState);
@@ -613,6 +645,101 @@ function EditProfileContent() {
       }
     } catch (err) {
       toast.error("Failed to delete", { id: toastId });
+    }
+  };
+
+  const handleHoroscopeUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+    const ext = file.name.split('.').pop()?.toLowerCase();
+    const isValidExt = ['jpg', 'jpeg', 'png', 'pdf'].includes(ext || '');
+
+    if (!validTypes.includes(file.type) && !isValidExt) {
+      toast.error("Please upload a valid PDF or JPG/PNG image file.");
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error("Horoscope file size must be less than 5MB.");
+      if (e.target) e.target.value = '';
+      return;
+    }
+
+    setUploadingHoroscope(true);
+    const toastId = toast.loading(horoscope ? "Replacing horoscope..." : "Uploading horoscope...");
+    const previousPath = horoscope?.fileUrl;
+    let uploadedPath: string | null = null;
+
+    try {
+      const { path, signedUrl, fileName } = await uploadHoroscopeFile(user.id, file);
+      uploadedPath = path;
+      const saved = await saveHoroscope(user.id, path, fileName);
+      if (saved) {
+        setHoroscope(saved);
+        setHoroscopeSignedUrl(saved.signedUrl || signedUrl);
+        // Clean up previous storage file if replacing and different
+        if (previousPath && previousPath !== path) {
+          try {
+            await deleteHoroscopeFile(user.id, previousPath);
+          } catch (cleanupErr) {
+            console.warn("Could not delete old horoscope storage file:", cleanupErr);
+          }
+        }
+        await refresh();
+        toast.success(horoscope ? "Horoscope replaced successfully!" : "Horoscope uploaded successfully!", { id: toastId });
+      } else {
+        throw new Error("Failed to save horoscope to database.");
+      }
+    } catch (err) {
+      // Rollback: prevent orphan file in private storage if database save failed
+      if (uploadedPath) {
+        try {
+          await deleteHoroscopeFile(user.id, uploadedPath);
+        } catch {
+          // Ignore rollback error
+        }
+      }
+      toast.error(err instanceof Error ? err.message : "Horoscope upload failed", { id: toastId });
+    } finally {
+      setUploadingHoroscope(false);
+      if (e.target) e.target.value = '';
+    }
+  };
+
+  const handleDeleteHoroscope = async () => {
+    if (!user || !horoscope) return;
+    if (!window.confirm("Are you sure you want to remove your uploaded horoscope?")) {
+      return;
+    }
+    const toastId = toast.loading("Removing horoscope...");
+    try {
+      const success = await deleteHoroscope(user.id, horoscope.fileUrl);
+      if (success) {
+        setHoroscope(null);
+        setHoroscopeSignedUrl(null);
+        await refresh();
+        toast.success("Horoscope removed successfully", { id: toastId });
+      } else {
+        throw new Error("Failed to remove horoscope.");
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to remove horoscope", { id: toastId });
+    }
+  };
+
+  const handleViewHoroscope = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!horoscope) return;
+    try {
+      const { getHoroscopeSignedUrl } = await import('@/lib/supabase');
+      const freshUrl = await getHoroscopeSignedUrl(horoscope.fileUrl, 3600);
+      setHoroscopeSignedUrl(freshUrl);
+      window.open(freshUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      toast.error("Failed to generate secure link to view horoscope.");
     }
   };
 
@@ -1031,14 +1158,154 @@ function EditProfileContent() {
                   <FormField label="Time of Birth" hint="Used for jathagam matching">
                     <FormInput type="time" value={timeOfBirth} onChange={setTimeOfBirth} placeholder="e.g. 10:30" />
                   </FormField>
-                  <FormField label="Upload Horoscope" hint="PDF or JPG of your jathagam">
-                    <button
-                      type="button"
-                      onClick={() => toast("Horoscope upload coming soon")}
-                      style={{ width: "100%", background: "#fafafa", border: "2px dashed var(--border-color)", borderRadius: "var(--radius-md)", padding: "0.75rem", cursor: "pointer", color: "var(--text-secondary)", fontFamily: "var(--font-sans)", fontSize: "0.8125rem", display: "flex", alignItems: "center", justifyContent: "center", gap: "6px" }}
-                    >
-                      <Upload size={14} /> Upload Horoscope (PDF/JPG)
-                    </button>
+                  <FormField label="Upload Horoscope" hint="PDF or JPG of your jathagam, max 5MB (Optional)">
+                    {horoscope ? (
+                      <div
+                        style={{
+                          width: "100%",
+                          border: "1.5px solid var(--border-color)",
+                          borderRadius: "var(--radius-md)",
+                          padding: "0.75rem",
+                          background: "#fff",
+                          boxSizing: "border-box",
+                        }}
+                      >
+                        <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "0.625rem" }}>
+                          {horoscope.fileUrl.toLowerCase().includes(".pdf") || (horoscope.fileName || "").toLowerCase().endsWith(".pdf") ? (
+                            <div style={{ width: "42px", height: "42px", borderRadius: "var(--radius-md)", background: "#FFF3E0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, color: "#E65100" }}>
+                              <FileText size={22} />
+                            </div>
+                          ) : (
+                            <a
+                              href={horoscopeSignedUrl || "#"}
+                              onClick={handleViewHoroscope}
+                              title="Click to view full image"
+                              style={{ width: "42px", height: "42px", borderRadius: "var(--radius-md)", overflow: "hidden", border: "1px solid var(--border-color)", flexShrink: 0, display: "block", cursor: "pointer" }}
+                            >
+                              {horoscopeSignedUrl ? (
+                                <img src={horoscopeSignedUrl} alt="Horoscope Preview" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              ) : (
+                                <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#f5f5f5" }}>
+                                  <FileText size={18} color="#888" />
+                                </div>
+                              )}
+                            </a>
+                          )}
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <p style={{ margin: 0, fontWeight: 700, fontSize: "0.8125rem", color: "var(--text-dark)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {horoscope.fileName || "Horoscope"}
+                            </p>
+                            <p style={{ margin: "2px 0 0", fontSize: "0.75rem", color: "var(--success)", fontWeight: 600, display: "flex", alignItems: "center", gap: "4px" }}>
+                              <Check size={12} /> Horoscope saved
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Action buttons: View, Replace, Remove */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "12px", borderTop: "1px solid var(--border-light)", paddingTop: "0.5rem" }}>
+                          <button
+                            type="button"
+                            onClick={handleViewHoroscope}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              color: "var(--primary)",
+                              textDecoration: "none",
+                              cursor: "pointer",
+                              fontFamily: "var(--font-sans)",
+                            }}
+                          >
+                            <ExternalLink size={12} /> View
+                          </button>
+                          <button
+                            type="button"
+                            disabled={uploadingHoroscope}
+                            onClick={() => horoscopeInputRef.current?.click()}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              color: "var(--text-secondary)",
+                              cursor: uploadingHoroscope ? "not-allowed" : "pointer",
+                              fontFamily: "var(--font-sans)",
+                            }}
+                          >
+                            <RefreshCw size={12} /> {uploadingHoroscope ? "Uploading..." : "Replace"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={uploadingHoroscope}
+                            onClick={handleDeleteHoroscope}
+                            style={{
+                              background: "none",
+                              border: "none",
+                              padding: 0,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: "4px",
+                              fontSize: "0.75rem",
+                              fontWeight: 600,
+                              color: "#D32F2F",
+                              cursor: uploadingHoroscope ? "not-allowed" : "pointer",
+                              fontFamily: "var(--font-sans)",
+                              marginLeft: "auto",
+                            }}
+                          >
+                            <Trash2 size={12} /> Remove
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        disabled={uploadingHoroscope}
+                        onClick={() => horoscopeInputRef.current?.click()}
+                        style={{
+                          width: "100%",
+                          background: "#fafafa",
+                          border: "2px dashed var(--border-color)",
+                          borderRadius: "var(--radius-md)",
+                          padding: "0.75rem",
+                          cursor: uploadingHoroscope ? "not-allowed" : "pointer",
+                          color: "var(--text-secondary)",
+                          fontFamily: "var(--font-sans)",
+                          fontSize: "0.8125rem",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: "6px",
+                        }}
+                      >
+                        {uploadingHoroscope ? (
+                          <>
+                            <span style={{ animation: "spin 0.8s linear infinite", display: "inline-block" }}>⟳</span>
+                            Uploading Horoscope...
+                          </>
+                        ) : (
+                          <>
+                            <Upload size={14} /> Upload Horoscope (PDF/JPG, max 5MB)
+                          </>
+                        )}
+                      </button>
+                    )}
+                    <input
+                      ref={horoscopeInputRef}
+                      type="file"
+                      accept="image/jpeg,image/png,image/jpg,application/pdf,.pdf,.jpg,.jpeg,.png"
+                      onChange={handleHoroscopeUpload}
+                      style={{ display: "none" }}
+                    />
                   </FormField>
                 </FieldGrid>
               </SectionCard>

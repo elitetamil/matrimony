@@ -1,9 +1,9 @@
 // public/sw.js
 // ── Elite Tamil Matrimony — Service Worker ─────────────────────────────────
-// Activated only when user accepts cookie consent.
+// Activated only when user accepts cookie consent in production.
 // Caches the app shell, static assets, and key pages for offline/fast loading.
 
-const CACHE_NAME = "etm-v2";
+const CACHE_NAME = "etm-v3";
 
 // Assets to pre-cache on install
 const PRECACHE_URLS = [
@@ -32,8 +32,16 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Don't intercept non-GET requests, API calls, or unsupported schemes
-  if (event.request.method !== "GET" || url.pathname.startsWith("/api/") || !url.protocol.startsWith('http')) return;
+  // Don't intercept non-GET requests, API calls, localhost development, or unsupported schemes
+  if (
+    event.request.method !== "GET" ||
+    url.pathname.startsWith("/api/") ||
+    !url.protocol.startsWith("http") ||
+    url.hostname === "localhost" ||
+    url.hostname === "127.0.0.1"
+  ) {
+    return;
+  }
 
   // For static assets — cache-first
   if (
@@ -42,13 +50,15 @@ self.addEventListener("fetch", (event) => {
   ) {
     event.respondWith(
       caches.match(event.request).then(
-        (cached) => cached || fetch(event.request).then((res) => {
-          if (res && res.ok) {
-            const clone = res.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
-          }
-          return res;
-        })
+        (cached) =>
+          cached ||
+          fetch(event.request).then((res) => {
+            if (res && res.ok) {
+              const clone = res.clone();
+              caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+            }
+            return res;
+          })
       )
     );
     return;

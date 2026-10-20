@@ -427,7 +427,7 @@ export default function MembershipPage() {
           <section style={{ maxWidth: "960px", margin: "0 auto", padding: "1rem 1rem 4rem" }}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: "1rem" }}>
               {[
-                { icon: <Shield size={20} style={{ color: "#2E7D32" }} />, title: "100% Secure Payment", desc: "Powered by Razorpay with 256-bit SSL encryption" },
+                { icon: <Shield size={20} style={{ color: "#2E7D32" }} />, title: "100% Secure Payment", desc: "Powered by Cashfree with 256-bit SSL encryption" },
                 { icon: <Award size={20} style={{ color: "#1565C0" }} />, title: "Verified Profiles Only", desc: "Every profile is mobile-verified by our team" },
                 { icon: <Phone size={20} style={{ color: "#6B1A2A" }} />, title: "24/7 Support", desc: "Our team is always here to help you find your match" },
               ].map((item) => (

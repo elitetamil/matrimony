@@ -19,3 +19,10 @@ export const supabaseAdmin = createClient(supabaseUrl, serviceRoleKey, {
     persistSession: false,
   },
 });
+
+export function assertSupabaseAdminConfigured() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key || key === 'dummy-key-for-build' || key.includes('dummy')) {
+    throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured or contains dummy build value.');
+  }
+}

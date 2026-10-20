@@ -1,4 +1,3 @@
-// Trigger Turbopack recompile
 "use client";
 
 import Link from "next/link";
@@ -16,9 +15,14 @@ import BottomNav from "./BottomNav";
 import { getProfilesByMobile, loginWithOtpSession, type RegisteredUser } from "@/lib/auth-store";
 import toast from "react-hot-toast";
 
-// ── Guest Center Navigation ────────────────────────────────────────────────────
-const GUEST_NAV = [
+// ── Guest navigation links — module-scope so server and client always see the
+// identical array reference, preventing React hydration mismatches.
+const GUEST_LINKS = [
   { label: "Home", href: "/" },
+  { label: "About Us", href: "/about" },
+  { label: "Matches", href: "/matches" },
+  { label: "Success Stories", href: "/success-stories" },
+  { label: "Contact", href: "/contact" },
 ];
 
 // ── SVG Icon Components ───────────────────────────────────────────────────────
@@ -831,13 +835,7 @@ export default function Navbar() {
   }
 
   // ── GUEST NAVBAR ──────────────────────────────────────────────────────────
-  const GUEST_LINKS = [
-    { label: "Home", href: "/" },
-    { label: "About Us", href: "/about" },
-    { label: "Matches", href: "/matches" },
-    { label: "Success Stories", href: "/success-stories" },
-    { label: "Contact", href: "/contact" },
-  ];
+  // GUEST_LINKS is defined at module scope above — do not re-declare here.
 
   return (
     <header

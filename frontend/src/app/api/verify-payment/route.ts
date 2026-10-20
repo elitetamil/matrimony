@@ -1,181 +1,252 @@
 import { NextRequest, NextResponse } from "next/server";
-import crypto from "crypto";
-import { Resend } from "resend";
-import { supabaseAdmin } from "@/lib/supabase-admin";
-import { paymentConfirmationHtml, paymentConfirmationText } from "@/lib/email/templates";
-
-const resend = new Resend(process.env.RESEND_API_KEY || "re_dummy_key_for_build");
-const FROM = process.env.RESEND_FROM_EMAIL ?? "Elite Tamil Matrimony <admin@elitetamilmatrimony.com>";
-
-// Plan config — single source of truth for this route
-const PLAN_CONFIG = {
-  Gold:     { period: "1 Month",  months: 1, features: ["Browse verified profiles","Unlimited interests","30 contact reveals per month","AI compatibility score for every match","Priority profile listing","Advanced search (25+ filters)","See who viewed your profile","Chat with all matched profiles"] },
-  PrimeGold: { period: "3 Months", months: 3, features: ["Everything in Gold","Unlimited contact reveals for 3 months","Priority profile listing","Chat with all matched profiles"] },
-  PrimeTillUMarry: { period: "Till you marry", months: 120, features: ["Everything in PrimeGold","Unlimited contact reveals until marriage","Dedicated account manager"] },
-  Diamond:  { period: "1 Month",  months: 1, features: ["Everything in Gold","Unlimited contact reveals","First-page priority placement","Video call request feature","Exclusive Diamond-only matches","Dedicated account manager"] },
-  Platinum: { period: "3 Months", months: 3, features: ["Everything in Diamond","Dedicated human matchmaker","Hand-curated match recommendations","Background verification assistance","Profile video introduction","Priority 24/7 support","Astrology compatibility check","Guaranteed 100 curated introductions"] },
-} as const;
-
-type PlanKey = keyof typeof PLAN_CONFIG;
+import { supabaseAdmin, assertSupabaseAdminConfigured } from "@/lib/supabase-admin";
+import { MEMBERSHIP_PLANS, CHECKOUT_PLAN_KEYS, getPlanPricing } from "@/lib/membership-plans";
+import { getCashfreeOrder, getCashfreeOrderPayments } from "@/lib/cashfree";
+import { activateMembershipOrder } from "@/lib/membership-activation";
 
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    assertSupabaseAdminConfigured();
+
+    // ── 1. Authenticate Requesting User Server-Side ─────────────────────────
+    const authHeader = req.headers.get("authorization");
+    const token = authHeader?.replace(/^Bearer\s+/i, "");
+
+    if (!token) {
+      return NextResponse.json(
+        { error: "Authentication required to verify payment. Please log in." },
+        { status: 401 }
+      );
+    }
+
     const {
-      razorpay_payment_id,
-      razorpay_order_id,
-      razorpay_signature,
-      planKey,
-      userId,
-      userEmail,
-      userName,
-      amountPaid,
-    } = body as {
-      razorpay_payment_id: string;
-      razorpay_order_id: string;
-      razorpay_signature: string;
-      planKey: string;
-      userId?: string;
-      userEmail?: string;
-      userName?: string;
-      amountPaid?: number;
-    };
+      data: { user },
+      error: authErr,
+    } = await supabaseAdmin.auth.getUser(token);
 
-    // ── 1. Validate required fields ─────────────────────────────────────────
-    if (!razorpay_payment_id || !razorpay_order_id || !razorpay_signature) {
-      return NextResponse.json({ error: "Missing required payment fields." }, { status: 400 });
-    }
-    if (!planKey || !(planKey in PLAN_CONFIG)) {
-      return NextResponse.json({ error: "Invalid or missing plan key." }, { status: 400 });
+    if (authErr || !user) {
+      return NextResponse.json(
+        { error: "Invalid or expired session. Please log in again." },
+        { status: 401 }
+      );
     }
 
-    // ── 2. Verify Razorpay HMAC-SHA256 signature ────────────────────────────
-    const keySecret = process.env.RAZORPAY_KEY_SECRET!;
-    const generatedSignature = crypto
-      .createHmac("sha256", keySecret)
-      .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-      .digest("hex");
+    const body = await req.json();
+    const { order_id } = body as { order_id?: string };
 
-    if (generatedSignature !== razorpay_signature) {
-      console.error("[verify-payment] Signature mismatch — possible tampered request");
-      return NextResponse.json({ error: "Payment signature verification failed." }, { status: 400 });
+    if (!order_id) {
+      return NextResponse.json({ error: "order_id is required." }, { status: 400 });
     }
 
-    // ── 3. Update membership in Supabase using SERVICE ROLE (bypasses RLS) ──
-    const plan = planKey as PlanKey;
-    const planInfo = PLAN_CONFIG[plan];
-    const expiry = new Date();
-    expiry.setMonth(expiry.getMonth() + planInfo.months);
-    const expiryIso = expiry.toISOString();
-    const now = new Date().toISOString();
-    const pricePaidInr = amountPaid ? Math.round(amountPaid / 100) : 0;
+    // ── 2. Load Persisted Order Record from Database ────────────────────────
+    // Never trust client-supplied plan, amount, or userId
+    const { data: orderRecord, error: orderFetchErr } = await supabaseAdmin
+      .from("payments")
+      .select("*")
+      .eq("order_id", order_id)
+      .maybeSingle();
 
-    let dbError: string | null = null;
-    let profileName = userName ?? "Member";
-    let profileEmail = userEmail ?? null;
+    if (orderFetchErr || !orderRecord) {
+      return NextResponse.json(
+        { error: `Payment order record "${order_id}" not found in database.` },
+        { status: 404 }
+      );
+    }
 
-    if (userId) {
-      // Try full membership update
-      const { error: updateError } = await supabaseAdmin
+    // ── 3. Strict Ownership & Plan Validation ───────────────────────────────
+    // An order cannot be verified or activated for a different user
+    if (orderRecord.user_id !== user.id) {
+      console.warn(
+        `[verify-payment] Unauthorized verification attempt: User ${user.id} tried to verify order ${order_id} belonging to user ${orderRecord.user_id}`
+      );
+      return NextResponse.json(
+        { error: "Unauthorized: You do not own this order." },
+        { status: 403 }
+      );
+    }
+
+    // Fail-Closed: Validate plan key, never silently default to Gold
+    if (
+      !orderRecord.plan_key ||
+      !(orderRecord.plan_key in MEMBERSHIP_PLANS) ||
+      !CHECKOUT_PLAN_KEYS.includes(orderRecord.plan_key as any)
+    ) {
+      return NextResponse.json(
+        { error: `Order record has invalid or uncheckoutable plan key: "${orderRecord.plan_key}".` },
+        { status: 400 }
+      );
+    }
+
+    const planInfo = MEMBERSHIP_PLANS[orderRecord.plan_key];
+
+    // If order is already completed, return success immediately (Idempotency)
+    if (orderRecord.status === "success") {
+      const { data: userProfile } = await supabaseAdmin
         .from("profiles")
-        .update({
-          is_premium:             true,
-          membership_plan:        plan,
-          membership_expiry:      expiryIso,
-          membership_activated:   now,
-          membership_price_paid:  pricePaidInr,
-          membership_plan_period: planInfo.period,
-          updated_at:             now,
-        })
-        .eq("id", userId);
+        .select("membership_expiry")
+        .eq("id", user.id)
+        .maybeSingle();
 
-      if (updateError) {
-        console.error("[verify-payment] Full update failed:", updateError.message);
-        // Fallback: try minimal update (in case membership_plan column doesn't exist yet)
-        const { error: fallbackError } = await supabaseAdmin
-          .from("profiles")
-          .update({ is_premium: true, updated_at: now })
-          .eq("id", userId);
+      return NextResponse.json({
+        success: true,
+        alreadyActive: true,
+        order_id,
+        plan: planInfo.name,
+        planKey: orderRecord.plan_key,
+        planPeriod: planInfo.period,
+        expiry: userProfile?.membership_expiry,
+      });
+    }
 
-        if (fallbackError) {
-          console.error("[verify-payment] Fallback update also failed:", fallbackError.message);
-          dbError = fallbackError.message;
-        } else {
-          console.warn("[verify-payment] Fallback (is_premium only) succeeded. Run SQL migration to add membership columns.");
+    // ── 4. Query Cashfree Server-Side to Verify Payment ─────────────────────
+    let isSuccess = false;
+    let paymentId = "";
+    let confirmedAmount: number | null = null;
+    let paymentMethod = "CASHFREE";
+
+    try {
+      const payments = await getCashfreeOrderPayments(order_id);
+      if (Array.isArray(payments) && payments.length > 0) {
+        const successfulTxn = payments.find(
+          (p: any) => p.payment_status === "SUCCESS"
+        );
+        if (successfulTxn) {
+          isSuccess = true;
+          paymentId = String(successfulTxn.cf_payment_id || order_id);
+          confirmedAmount = successfulTxn.payment_amount ?? null;
+          paymentMethod = successfulTxn.payment_group || "CASHFREE";
+
+          // Verify currency is INR
+          if (
+            successfulTxn.payment_currency &&
+            successfulTxn.payment_currency.toUpperCase() !== "INR"
+          ) {
+            return NextResponse.json(
+              { error: `Payment currency mismatch. Expected INR, received ${successfulTxn.payment_currency}.` },
+              { status: 400 }
+            );
+          }
         }
-      } else {
-        console.log(`[verify-payment] ✓ Membership upgraded to ${plan} for user ${userId}`);
       }
+    } catch (fetchErr) {
+      console.warn("[verify-payment] Error fetching order payments, falling back to order fetch:", fetchErr);
+    }
 
-      // Also log transaction (non-fatal)
-      supabaseAdmin.from("membership_transactions").insert({
-        profile_id:       userId,
-        plan,
-        razorpay_payment_id,
-        amount_paid_inr:  pricePaidInr,
-        plan_period:      planInfo.period,
-        activated_at:     now,
-        expires_at:       expiryIso,
-      }).then(({ error }) => {
-        if (error) console.warn("[verify-payment] Transaction log failed (non-fatal):", error.message);
-      });
+    // Fallback: Check order status directly
+    if (!isSuccess) {
+      try {
+        const orderData = await getCashfreeOrder(order_id);
+        if (orderData.order_status === "PAID") {
+          isSuccess = true;
+          paymentId = String(orderData.cf_order_id || order_id);
+          confirmedAmount = orderData.order_amount ?? null;
 
-      // Fetch profile details for confirmation email
-      const { data: profileRow } = await supabaseAdmin
-        .from("profiles")
-        .select("name, email")
-        .eq("id", userId)
-        .single();
-      if (profileRow?.name) profileName = profileRow.name;
-      if (profileRow?.email && !profileRow.email.endsWith("@etm.app")) {
-        profileEmail = profileRow.email;
+          // Verify currency is INR
+          if (
+            orderData.order_currency &&
+            orderData.order_currency.toUpperCase() !== "INR"
+          ) {
+            return NextResponse.json(
+              { error: `Payment currency mismatch. Expected INR, received ${orderData.order_currency}.` },
+              { status: 400 }
+            );
+          }
+        } else {
+          return NextResponse.json(
+            {
+              error: `Payment not completed. Current order status: ${orderData.order_status}`,
+              order_status: orderData.order_status,
+            },
+            { status: 400 }
+          );
+        }
+      } catch (orderErr: any) {
+        console.error("[verify-payment] Failed to verify order with Cashfree:", orderErr.message);
+        return NextResponse.json(
+          { error: "Could not verify order with payment gateway. Please contact support." },
+          { status: 502 }
+        );
       }
     }
 
-    // ── 4. Send confirmation email (non-blocking) ───────────────────────────
-    const recipientEmail = userEmail || profileEmail;
-    if (recipientEmail && !recipientEmail.endsWith("@etm.app")) {
-      const expiryStr = expiry.toLocaleDateString("en-IN", {
-        day: "numeric", month: "long", year: "numeric",
-      });
-      resend.emails.send({
-        from: FROM,
-        to: [recipientEmail],
-        subject: `Payment Confirmed 🎉 — ${plan} Membership Active`,
-        html: paymentConfirmationHtml({
-          name: profileName,
-          plan,
-          amount: pricePaidInr,
-          paymentId: razorpay_payment_id,
-          planPeriod: planInfo.period,
-          planFeatures: [...planInfo.features],
-          expiryDate: expiryStr,
-        }),
-        text: paymentConfirmationText({
-          name: profileName,
-          plan,
-          amount: pricePaidInr,
-          paymentId: razorpay_payment_id,
-          planPeriod: planInfo.period,
-          expiryDate: expiryStr,
-        }),
-      }).catch((err: unknown) => {
-        console.error("[verify-payment] Confirmation email failed:", err);
-      });
+    if (!isSuccess || confirmedAmount === null) {
+      return NextResponse.json(
+        { error: "Payment verification failed. No successful payment found for this order." },
+        { status: 400 }
+      );
     }
 
-    // ── 5. Return success ───────────────────────────────────────────────────
+    // ── 5. Verify Exact Paid Amount Against Authoritative Plan Pricing ─────
+    // Validate persisted order amount against authoritative server-side plan price + 18% GST
+    const authoritativePricing = getPlanPricing(orderRecord.plan_key);
+    if (!authoritativePricing || Math.abs(Number(orderRecord.amount) - authoritativePricing.total) >= 0.01) {
+      console.error(
+        `[verify-payment] Order record amount (${orderRecord.amount}) does not match authoritative plan pricing (${authoritativePricing?.total}) for plan "${orderRecord.plan_key}".`
+      );
+      return NextResponse.json(
+        { error: "Order record amount does not match authoritative plan pricing." },
+        { status: 400 }
+      );
+    }
+
+    const expectedAmount = authoritativePricing.total;
+    // Remove rounded comparison that could accept incorrect amounts; require exact match to 2 decimal places
+    if (Math.abs(confirmedAmount - expectedAmount) >= 0.01) {
+      console.error(
+        `[verify-payment] Exact amount mismatch for order ${order_id}: Expected ₹${expectedAmount}, Received ₹${confirmedAmount}`
+      );
+      return NextResponse.json(
+        {
+          error: `Payment amount mismatch. Expected ₹${expectedAmount}, received ₹${confirmedAmount}.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    if (!paymentId || paymentId.trim() === "") {
+      return NextResponse.json(
+        { error: "Payment verification failed: Gateway returned an empty payment ID." },
+        { status: 400 }
+      );
+    }
+
+    // ── 6. Execute Shared Idempotent Activation ────────────────────────────
+    const activationResult = await activateMembershipOrder({
+      orderId: order_id,
+      userId: user.id,
+      planKey: orderRecord.plan_key,
+      amount: confirmedAmount,
+      paymentId: paymentId.trim(),
+      gateway: "cashfree",
+      paymentMethod,
+    });
+
+    if (!activationResult.success && !activationResult.alreadyActive) {
+      const status = activationResult.inProgress ? 409 : 500;
+      return NextResponse.json(
+        {
+          error: activationResult.error || "Payment was verified but membership activation failed. Support has been notified.",
+          inProgress: activationResult.inProgress,
+        },
+        { status }
+      );
+    }
+
     return NextResponse.json({
       success: true,
-      payment_id: razorpay_payment_id,
-      plan,
-      expiry: expiryIso,
-      ...(dbError ? { db_warning: dbError } : {}),
+      alreadyActive: activationResult.alreadyActive,
+      order_id,
+      payment_id: paymentId,
+      plan: activationResult.planName,
+      planKey: activationResult.planKey,
+      planPeriod: activationResult.planPeriod,
+      expiry: activationResult.expiry,
     });
-  } catch (err) {
-    console.error("[verify-payment] Unhandled error:", err);
+  } catch (err: unknown) {
+    const error = err as Error;
+    console.error("[verify-payment] Internal error:", error.message);
     return NextResponse.json(
-      { error: "Payment verification failed. Please contact support." },
+      { error: error.message || "An unexpected error occurred during payment verification." },
       { status: 500 }
     );
   }

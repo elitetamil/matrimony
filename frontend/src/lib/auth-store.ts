@@ -97,6 +97,17 @@ export interface RegisteredUser {
   membershipPlanPeriod?: string; // e.g. "1 Month", "3 Months"
   photos?: ProfilePhoto[];
   casteChangeCount?: number; // tracks how many times caste has been changed
+  horoscope?: UserHoroscope;
+  hasHoroscope?: boolean;
+}
+
+export interface UserHoroscope {
+  id: string;
+  userId: string;
+  fileUrl: string; // Stable relative storage path in private bucket
+  fileName?: string;
+  uploadedAt: string;
+  signedUrl?: string; // Fresh signed URL for authorized preview
 }
 
 export type RegisterPayload = Omit<RegisteredUser, 'id' | 'createdAt' | 'isVerified' | 'isPremium'> & {
@@ -154,7 +165,9 @@ function dbToUser(row: Record<string, any>): RegisteredUser {
     isPremium: row.is_premium ?? false,
     // Compute age from DOB
     age: row.dob ? Math.floor((Date.now() - new Date(row.dob).getTime()) / (365.25 * 24 * 3600 * 1000)) : undefined,
-    partnerGender: row.partner_gender ?? undefined,
+    location: [row.city, row.state].filter(Boolean).join(', ') || row.country || 'India',
+    community: row.caste ? (row.subcaste ? `${row.caste}, ${row.subcaste}` : row.caste) : (row.mother_tongue || 'Tamil'),
+    partnerGender: row.partner_gender ?? (row.gender === 'male' ? 'female' : row.gender === 'female' ? 'male' : undefined),
     partnerAgeMin: row.partner_age_min ?? undefined,
     partnerAgeMax: row.partner_age_max ?? undefined,
     partnerReligion: row.partner_religion ?? undefined,
@@ -189,19 +202,50 @@ function dbToUser(row: Record<string, any>): RegisteredUser {
       createdAt: p.created_at,
     })) : [],
     casteChangeCount: row.caste_change_count ?? 0,
+    hasHoroscope: row.has_horoscope ?? Boolean(row.horoscopes && (!Array.isArray(row.horoscopes) || row.horoscopes.length > 0)),
+    horoscope: row.horoscopes ? (() => {
+      const h = Array.isArray(row.horoscopes) ? row.horoscopes[0] : row.horoscopes;
+      return h ? {
+        id: h.id,
+        userId: h.user_id,
+        fileUrl: h.file_url,
+        fileName: h.file_name ?? undefined,
+        uploadedAt: h.uploaded_at ?? new Date().toISOString(),
+      } : undefined;
+    })() : undefined,
   };
 }
+
+// Set of valid columns physically present in the Supabase public.profiles table.
+// Columns not present in the DB table must NOT be sent to PostgREST to prevent PGRST204 errors.
+const VALID_PROFILES_COLUMNS = new Set([
+  'about', 'admin_notes', 'auth_email', 'ban_reason', 'brothers', 'caste', 'caste_change_count', 'city',
+  'college', 'company', 'country', 'created_at', 'dhosham', 'diet', 'disabilities',
+  'dob', 'drinking', 'education', 'email', 'employment_type', 'family_status',
+  'family_type', 'father_occupation', 'gender', 'gothram', 'has_horoscope', 'height', 'hobbies',
+  'id', 'income', 'interests', 'is_banned', 'is_premium', 'is_verified', 'languages',
+  'last_active', 'marital_status', 'membership_activated', 'membership_expiry',
+  'membership_plan', 'membership_plan_period', 'membership_price_paid', 'mobile',
+  'mother_occupation', 'mother_tongue', 'name', 'native_place', 'occupation',
+  'partner_age_max', 'partner_age_min', 'partner_caste', 'partner_country',
+  'partner_education', 'partner_gender', 'partner_height_max', 'partner_height_min', 'partner_income',
+  'partner_marital_status', 'partner_mother_tongue', 'partner_occupation',
+  'partner_religion', 'photo_url', 'physical_status', 'profile_for', 'rasi',
+  'religion', 'sisters', 'smoking', 'star', 'state', 'subcaste', 'updated_at',
+  'verification_document', 'verification_status', 'weight'
+]);
 
 // Convert camelCase app object → snake_case DB fields
 // IMPORTANT: Empty strings are treated as null (skipped) to prevent
 // Postgres type errors on date/check-constrained columns.
+// Any column not present in the DB schema is filtered out to avoid PostgREST PGRST204 errors.
 function userToDb(data: Partial<RegisteredUser>): Record<string, unknown> {
   const db: Record<string, unknown> = {};
 
-  // Helper: skip undefined OR empty string values
+  // Helper: skip undefined, null, empty string, and only allow columns in the DB schema
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const set = (col: string, val: any) => {
-    if (val !== undefined && val !== null && val !== '') {
+    if (val !== undefined && val !== null && val !== '' && VALID_PROFILES_COLUMNS.has(col)) {
       db[col] = val;
     }
   };
@@ -259,23 +303,23 @@ function userToDb(data: Partial<RegisteredUser>): Record<string, unknown> {
 
   // Date field — MUST be a valid ISO date string or omitted entirely
   // An empty string "" would cause: invalid input syntax for type date: ""
-  if (data.dob && data.dob.trim() !== '') {
+  if (data.dob && data.dob.trim() !== '' && VALID_PROFILES_COLUMNS.has('dob')) {
     db.dob = data.dob;
   }
 
   // Array fields — send empty arrays rather than skipping
-  if (data.languages !== undefined)           db.languages = data.languages;
-  if (data.hobbies !== undefined)             db.hobbies = data.hobbies;
-  if (data.interests !== undefined)           db.interests = data.interests;
-  if (data.partnerMaritalStatus !== undefined) db.partner_marital_status = data.partnerMaritalStatus;
-  if (data.partnerMotherTongue !== undefined)  db.partner_mother_tongue = data.partnerMotherTongue;
+  if (data.languages !== undefined && VALID_PROFILES_COLUMNS.has('languages'))           db.languages = data.languages;
+  if (data.hobbies !== undefined && VALID_PROFILES_COLUMNS.has('hobbies'))               db.hobbies = data.hobbies;
+  if (data.interests !== undefined && VALID_PROFILES_COLUMNS.has('interests'))           db.interests = data.interests;
+  if (data.partnerMaritalStatus !== undefined && VALID_PROFILES_COLUMNS.has('partner_marital_status')) db.partner_marital_status = data.partnerMaritalStatus;
+  if (data.partnerMotherTongue !== undefined && VALID_PROFILES_COLUMNS.has('partner_mother_tongue'))  db.partner_mother_tongue = data.partnerMotherTongue;
 
   // Numeric fields — only include if they are actual numbers
-  if (typeof data.partnerAgeMin === 'number') db.partner_age_min = data.partnerAgeMin;
-  if (typeof data.partnerAgeMax === 'number') db.partner_age_max = data.partnerAgeMax;
-  if (typeof data.brothers === 'number')      db.brothers = data.brothers;
-  if (typeof data.sisters === 'number')       db.sisters = data.sisters;
-  if (typeof data.casteChangeCount === 'number') db.caste_change_count = data.casteChangeCount;
+  if (typeof data.partnerAgeMin === 'number' && VALID_PROFILES_COLUMNS.has('partner_age_min')) db.partner_age_min = data.partnerAgeMin;
+  if (typeof data.partnerAgeMax === 'number' && VALID_PROFILES_COLUMNS.has('partner_age_max')) db.partner_age_max = data.partnerAgeMax;
+  if (typeof data.brothers === 'number' && VALID_PROFILES_COLUMNS.has('brothers'))              db.brothers = data.brothers;
+  if (typeof data.sisters === 'number' && VALID_PROFILES_COLUMNS.has('sisters'))                db.sisters = data.sisters;
+  if (typeof data.casteChangeCount === 'number' && VALID_PROFILES_COLUMNS.has('caste_change_count')) db.caste_change_count = data.casteChangeCount;
 
   return db;
 }
@@ -357,10 +401,8 @@ export async function registerUser(payload: RegisterPayload): Promise<Registered
 
   // 2. If session is null (email confirmation pending), immediately sign in
   if (!authData.session) {
-    // Derive the correct password for this email
-    const pw = emailToUse === baseEmail
-      ? passwordToUse
-      : `ETM_${payload.mobile}_${emailToUse.match(/_([0-9]+)@/)?.[1] || '2'}_2024`;
+    // Use the password that was passed to signUp
+    const pw = passwordToUse;
 
     const { error: signInError } = await supabase.auth.signInWithPassword({
       email: emailToUse,
@@ -490,7 +532,11 @@ export async function getProfilesByMobile(mobile: string): Promise<RegisteredUse
 
   const { data } = await supabase
     .from('profiles')
-    .select('*')
+    .select(`
+      *,
+      photos:profile_photos(*),
+      horoscopes(*)
+    `)
     .eq('mobile', mobile)
     .order('created_at', { ascending: false });
 
@@ -502,7 +548,8 @@ export async function getProfilesByEmail(email: string): Promise<RegisteredUser[
     .from('profiles')
     .select(`
       *,
-      photos:profile_photos(*)
+      photos:profile_photos(*),
+      horoscopes(*)
     `)
     .or(`auth_email.eq.${email.trim().toLowerCase()},email.eq.${email.trim().toLowerCase()}`)
     .order('created_at', { ascending: false });
@@ -675,7 +722,8 @@ export async function fetchProfile(userId: string): Promise<RegisteredUser | nul
     .from('profiles')
     .select(`
       *,
-      photos:profile_photos(*)
+      photos:profile_photos(*),
+      horoscopes(*)
     `)
     .eq('id', userId)
     .single();
@@ -2570,14 +2618,99 @@ export async function sendInterestWithNotification(
 /**
  * Save horoscope record in horoscopes table
  */
-export async function saveHoroscope(userId: string, fileUrl: string, fileName?: string): Promise<void> {
+export async function saveHoroscope(userId: string, fileUrl: string, fileName?: string): Promise<UserHoroscope | null> {
+  try {
+    const { data, error } = await supabase
+      .from('horoscopes')
+      .upsert({ user_id: userId, file_url: fileUrl, file_name: fileName || 'horoscope' }, { onConflict: 'user_id' })
+      .select()
+      .single();
+    if (error) {
+      console.warn('Failed to save horoscope row:', error);
+      return null;
+    }
+
+    let signedUrl: string | undefined;
+    try {
+      const { getHoroscopeSignedUrl } = await import('@/lib/supabase');
+      signedUrl = await getHoroscopeSignedUrl(data.file_url, 86400);
+    } catch {
+      // Non-fatal
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      fileUrl: data.file_url,
+      signedUrl,
+      fileName: data.file_name ?? undefined,
+      uploadedAt: data.uploaded_at,
+    };
+  } catch (e) {
+    console.warn('Error saving horoscope row:', e);
+    return null;
+  }
+}
+
+/**
+ * Fetch a user's horoscope record from horoscopes table with fresh signed URL
+ */
+export async function getHoroscope(userId: string): Promise<UserHoroscope | null> {
+  try {
+    const { data, error } = await supabase
+      .from('horoscopes')
+      .select('*')
+      .eq('user_id', userId)
+      .maybeSingle();
+    if (error || !data) return null;
+
+    let signedUrl: string | undefined;
+    try {
+      const { getHoroscopeSignedUrl } = await import('@/lib/supabase');
+      signedUrl = await getHoroscopeSignedUrl(data.file_url, 3600);
+    } catch (urlErr) {
+      console.warn('[getHoroscope] Signed URL creation warning:', urlErr);
+    }
+
+    return {
+      id: data.id,
+      userId: data.user_id,
+      fileUrl: data.file_url,
+      signedUrl,
+      fileName: data.file_name ?? undefined,
+      uploadedAt: data.uploaded_at,
+    };
+  } catch (e) {
+    console.warn('Error fetching horoscope row:', e);
+    return null;
+  }
+}
+
+/**
+ * Delete a user's horoscope record from horoscopes table and storage
+ */
+export async function deleteHoroscope(userId: string, fileUrl?: string): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('horoscopes')
-      .upsert({ user_id: userId, file_url: fileUrl, file_name: fileName || 'horoscope' }, { onConflict: 'user_id' });
-    if (error) console.warn('Failed to save horoscope row:', error);
+      .delete()
+      .eq('user_id', userId);
+    if (error) {
+      console.error('Failed to delete horoscope row:', error);
+      return false;
+    }
+    if (fileUrl) {
+      try {
+        const { deleteHoroscopeFile } = await import('@/lib/supabase');
+        await deleteHoroscopeFile(userId, fileUrl);
+      } catch (storageErr) {
+        console.warn('Failed to delete horoscope from storage:', storageErr);
+      }
+    }
+    return true;
   } catch (e) {
-    console.warn('Error saving horoscope row:', e);
+    console.error('Error deleting horoscope row:', e);
+    return false;
   }
 }
 

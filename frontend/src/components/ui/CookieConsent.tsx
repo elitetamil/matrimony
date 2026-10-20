@@ -33,6 +33,15 @@ export default function CookieConsent() {
 
   useEffect(() => {
     setMounted(true);
+    // In development, unregister any service worker to avoid stale cached chunks and hydration mismatches
+    if (process.env.NODE_ENV !== "production" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (const reg of registrations) {
+          reg.unregister();
+        }
+      });
+    }
+
     const consent = getStoredConsent();
     if (consent === null) {
       // Small delay so it doesn't flash immediately on first render
@@ -44,8 +53,8 @@ export default function CookieConsent() {
   const handleAccept = () => {
     storeConsent("accepted");
     setVisible(false);
-    // Register service worker for offline caching when user consents
-    if ("serviceWorker" in navigator) {
+    // Register service worker for offline caching only in production
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       navigator.serviceWorker.register("/sw.js").catch(() => {
         // SW registration is optional — fail silently
       });

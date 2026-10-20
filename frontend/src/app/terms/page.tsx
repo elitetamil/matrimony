@@ -233,10 +233,10 @@ const sections: Section[] = [
 
         <h4>6.2 Payment</h4>
         <ul>
-          <li>All payments are processed securely through Razorpay, our payment gateway partner.</li>
+          <li>All payments are processed securely through Cashfree, our payment gateway partner.</li>
           <li>All prices are in Indian Rupees (INR) and inclusive of applicable GST.</li>
           <li>By purchasing a membership, you authorise us to charge your chosen payment method for the stated amount.</li>
-          <li>We do not store your card details. Payment information is handled entirely by Razorpay.</li>
+          <li>We do not store your card details. Payment information is handled entirely by Cashfree.</li>
         </ul>
 
         <h4>6.3 Refund Policy</h4>
@@ -251,6 +251,15 @@ const sections: Section[] = [
         <p>
           Membership plans expire after the stated duration. We do not auto-renew memberships. Upon expiry,
           your account automatically reverts to free status — no data is deleted.
+        </p>
+
+        <h4>6.5 Digital Service Delivery &amp; Fulfillment</h4>
+        <p>
+          Elite Tamil Matrimony provides digital matchmaking and membership services. Upon successful payment
+          verification by our payment gateway partner (Cashfree), your membership plan features and access benefits
+          are activated electronically and immediately on your registered account. No physical goods or shipments
+          are delivered. If your membership does not update automatically within 15 minutes of payment completion,
+          please contact our support team at <a href="mailto:support@elitetamilmatrimony.com" style={{ color: "var(--primary)" }}>support@elitetamilmatrimony.com</a> with your order ID for immediate provisioning.
         </p>
       </>
     ),

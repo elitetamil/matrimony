@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import Navbar from "@/components/layout/Navbar";
 import BackButton from "@/components/ui/BackButton";
 import CompactFooter from "@/components/layout/CompactFooter";
@@ -12,14 +13,9 @@ import {
 import { useAuth } from "@/context/AuthContext";
 import { updateProfile } from "@/lib/auth-store";
 import { cacheActivePlan } from "@/hooks/useMembership";
-
-// ── Razorpay window type augmentation ──────────────────────────────────────
-declare global {
-  interface Window {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    Razorpay: new (options: any) => { open(): void; on(event: string, cb: (res: any) => void): void };
-  }
-}
+import { load } from "@cashfreepayments/cashfree-js";
+import { supabase } from "@/lib/supabase";
+import { MEMBERSHIP_PLANS } from "@/lib/membership-plans";
 
 // ── Plan configuration ──────────────────────────────────────────────────────
 const PLAN_CONFIG = {
@@ -283,7 +279,7 @@ function PaymentForm({ planKey }: { planKey: PlanKey }) {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const razorpayScriptLoaded = useRef(false);
+  const [policyAgreed, setPolicyAgreed] = useState(true);
 
   // Email gate state — null = not verified yet
   const [verifiedEmail, setVerifiedEmail] = useState<string | null>(
@@ -292,30 +288,16 @@ function PaymentForm({ planKey }: { planKey: PlanKey }) {
 
   const gst = Math.round(plan.price * 0.18);
   const total = plan.price + gst;
-  const amountInPaise = total * 100;
-
-  const loadRazorpayScript = () => {
-    return new Promise((resolve) => {
-      if (window.Razorpay) {
-        resolve(true);
-        return;
-      }
-      const script = document.createElement("script");
-      script.src = "https://checkout.razorpay.com/v1/checkout.js";
-      script.onload = () => resolve(true);
-      script.onerror = () => resolve(false);
-      document.body.appendChild(script);
-    });
-  };
 
   const handleEmailVerified = async (email: string) => {
     setVerifiedEmail(email);
-    // Persist to Supabase profile immediately
     if (user?.id) {
       try {
         const updated = await updateProfile(user.id, { email });
         setUser(updated);
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
     }
   };
 
@@ -324,111 +306,80 @@ function PaymentForm({ planKey }: { planKey: PlanKey }) {
       setError("Please verify your email address before proceeding to payment.");
       return;
     }
+    if (!policyAgreed) {
+      setError("Please accept the Terms & Conditions and Refund Policy to proceed.");
+      return;
+    }
     setError(null);
     setSubmitting(true);
 
-    const isLoaded = await loadRazorpayScript();
-    if (!isLoaded || !window.Razorpay) {
-      setError("Payment gateway failed to load. Please check your internet connection or disable adblockers, then try again.");
-      setSubmitting(false);
-      return;
-    }
-
-    // STEP 1: Create Razorpay order
-    let orderData: { order_id: string; amount: number; currency: string };
     try {
+      // Get authenticated Supabase session token
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+
+      if (!token || !user) {
+        setError("You must be logged in to purchase a membership plan. Redirecting to login...");
+        setTimeout(() => {
+          router.push(`/login?redirect=${encodeURIComponent(`/payment?plan=${planKey}`)}`);
+        }, 1000);
+        setSubmitting(false);
+        return;
+      }
+
+      // STEP 1: Create Cashfree order (server-side secure amount & session creation)
       const res = await fetch("/api/create-order", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ amount: amountInPaise, planKey }),
-      });
-      if (!res.ok) { const b = await res.json(); throw new Error(b.error ?? "Failed to create order."); }
-      orderData = await res.json();
-    } catch (err: unknown) {
-      setError((err as Error).message ?? "Could not reach payment server. Please try again.");
-      setSubmitting(false);
-      return;
-    }
-
-    // STEP 2: Open Razorpay modal
-    const options = {
-      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
-      amount: orderData.amount,
-      currency: orderData.currency,
-      name: "Elite Tamil Matrimony",
-      description: `${plan.name} Membership — ${plan.period}`,
-      order_id: orderData.order_id,
-      prefill: {
-        name: user?.name ?? "",
-        email: verifiedEmail,
-        contact: user?.mobile ?? "",
-      },
-      theme: { color: "#6B1A2A" },
-      modal: {
-        ondismiss: () => {
-          setSubmitting(false);
-          setError("Payment was cancelled. You can try again.");
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      },
-      handler: async (response: { razorpay_payment_id: string; razorpay_order_id: string; razorpay_signature: string }) => {
-        // STEP 3: Verify signature + send confirmation email
-        try {
-          const verifyRes = await fetch("/api/verify-payment", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature,
-              planKey,
-              userId: user?.id,
-              userEmail: verifiedEmail,
-              userName: user?.name,
-              amountPaid: orderData.amount,
-            }),
-          });
-          const verifyData = await verifyRes.json();
-          if (!verifyRes.ok) throw new Error(verifyData.error ?? "Signature verification failed.");
+        body: JSON.stringify({
+          planKey,
+          userEmail: verifiedEmail,
+        }),
+      });
 
-          // ── STEP 4: Immediately activate plan client-side ─────────────────
-          // Calculate expiry
-          const months = planKey === "PrimeTillUMarry" ? 12 : 3;
-          const expiry = new Date();
-          expiry.setMonth(expiry.getMonth() + months);
-          const expiryIso = expiry.toISOString();
+      const orderData = await res.json();
+      if (!res.ok) {
+        throw new Error(orderData.error ?? "Failed to initiate payment session.");
+      }
 
-          // 1. Write to localStorage cache FIRST (survives refresh() race)
-          if (user?.id) cacheActivePlan(user.id, planKey, expiryIso);
+      if (!orderData.payment_session_id) {
+        throw new Error("Payment session ID was not returned by gateway.");
+      }
 
-          // 2. Update in-memory user state with full plan info
-          if (user) {
-            setUser({
-              ...user,
-              isPremium: true,
-              membershipPlan: planKey,
-              membershipExpiry: expiryIso,
-              email: verifiedEmail ?? user.email,
-            });
-          }
+      // STEP 2: Initialize Cashfree Drop-in Checkout
+      const cashfreeMode = (process.env.NEXT_PUBLIC_CASHFREE_ENV as "production" | "sandbox") || "sandbox";
+      const cashfree = await load({
+        mode: cashfreeMode,
+      });
 
-          // 3. Show success screen immediately — don't wait for DB sync
-          setSuccess(true);
+      if (!cashfree) {
+        throw new Error("Cashfree SDK failed to initialize. Please check your network connection.");
+      }
 
-          // 4. Background DB refresh (non-blocking — UI already updated above)
-          setTimeout(() => { refresh().catch(() => {}); }, 1500);
-        } catch (verifyErr: unknown) {
-          const e = verifyErr as Error;
-          setError(`Payment received but verification failed: ${e.message}. Contact support@elitetamilmatrimony.com with ID: ${response.razorpay_payment_id}`);
-        } finally { setSubmitting(false); }
-      },
-    };
+      // Open Cashfree Checkout Modal
+      const checkoutResult = await cashfree.checkout({
+        paymentSessionId: orderData.payment_session_id,
+        redirectTarget: "_modal",
+      });
 
-    const rzp = new window.Razorpay(options);
-    rzp.on("payment.failed", (resp: { error: { description: string; reason: string } }) => {
-      setError(`Payment failed: ${resp.error.description} (${resp.error.reason}). Please try again.`);
+      // Handle in-page result (when modal resolves without full-page navigation)
+      if (checkoutResult?.error) {
+        setError(checkoutResult.error.message || "Payment was cancelled or failed. You can try again.");
+        setSubmitting(false);
+        return;
+      }
+
+      // Redirect to verification status page to confirm with Cashfree server
+      router.push(`/payment/status?order_id=${orderData.order_id}`);
+    } catch (err: unknown) {
+      const e = err as Error;
+      console.error("[Cashfree Checkout Error]:", e);
+      setError(e.message || "Payment initiation failed. Please try again.");
       setSubmitting(false);
-    });
-    rzp.open();
+    }
   };
 
   // ── Success screen ─────────────────────────────────────────────────────────
@@ -485,8 +436,8 @@ function PaymentForm({ planKey }: { planKey: PlanKey }) {
         {/* Left: What you get */}
         <div>
           <div style={{ background: "#fff", border: "1px solid var(--border-color)", borderRadius: "var(--radius-xl)", padding: "1.5rem", marginBottom: "1.25rem" }}>
-            <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", color: "var(--text-dark)", marginBottom: "1rem" }}>Secure Checkout via Razorpay</h3>
-            <p style={{ fontSize: "0.875rem", color: "var(--text-medium)", lineHeight: 1.6, marginBottom: "1.25rem" }}>Click <strong>Pay Securely</strong> to open the Razorpay payment window. You can pay using:</p>
+            <h3 style={{ fontWeight: 700, fontSize: "0.9375rem", color: "var(--text-dark)", marginBottom: "1rem" }}>Secure Checkout via Cashfree</h3>
+            <p style={{ fontSize: "0.875rem", color: "var(--text-medium)", lineHeight: 1.6, marginBottom: "1.25rem" }}>Click <strong>Pay Securely</strong> to open the Cashfree payment window. You can pay using:</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.625rem", marginBottom: "1.25rem" }}>
               {[{ label: "Credit / Debit Card", sub: "Visa, Mastercard, RuPay" }, { label: "UPI", sub: "GPay, PhonePe, BHIM" }, { label: "Net Banking", sub: "All major Indian banks" }, { label: "Wallets", sub: "Paytm, Amazon Pay" }].map(m => (
                 <div key={m.label} style={{ border: "1px solid var(--border-light)", borderRadius: "var(--radius-md)", padding: "0.625rem 0.875rem", background: "var(--bg-page)" }}>
@@ -516,7 +467,7 @@ function PaymentForm({ planKey }: { planKey: PlanKey }) {
         </div>
 
         {/* Right: Order Summary + CTA */}
-        <div style={{ background: "#fff", border: "1px solid var(--border-color)", borderRadius: "var(--radius-xl)", overflow: "hidden", position: "sticky", top: "80px" }}>
+        <div className="payment-sidebar" style={{ background: "#fff", border: "1px solid var(--border-color)", borderRadius: "var(--radius-xl)", overflow: "hidden", position: "sticky", top: "80px" }}>
           <div style={{ background: plan.gradient, padding: "1.5rem", color: "#fff" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", marginBottom: "0.5rem" }}>
               <div style={{ width: "40px", height: "40px", borderRadius: "var(--radius-lg)", background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>{plan.icon}</div>
@@ -525,28 +476,50 @@ function PaymentForm({ planKey }: { planKey: PlanKey }) {
                 <div style={{ fontSize: "1.125rem", fontWeight: 800 }}>{plan.name}</div>
               </div>
             </div>
-            <div style={{ fontSize: "0.8125rem", opacity: 0.8 }}>{plan.description}</div>
+            <div style={{ fontSize: "0.8125rem", opacity: 0.85 }}>{plan.description} · {plan.period}</div>
           </div>
 
           <div style={{ padding: "0.875rem 1.25rem", borderBottom: "1px solid var(--border-light)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.375rem" }}><span>Plan Price</span><span>₹{plan.price.toLocaleString("en-IN")}</span></div>
             <div style={{ display: "flex", justifyContent: "space-between", fontSize: "0.8125rem", color: "var(--text-secondary)", marginBottom: "0.375rem" }}><span>GST (18%)</span><span>₹{gst.toLocaleString("en-IN")}</span></div>
-            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "1rem", color: "var(--text-dark)", paddingTop: "0.375rem", borderTop: "1px solid var(--border-light)", marginTop: "0.375rem" }}><span>Total</span><span>₹{total.toLocaleString("en-IN")}</span></div>
+            <div style={{ display: "flex", justifyContent: "space-between", fontWeight: 800, fontSize: "1rem", color: "var(--text-dark)", paddingTop: "0.375rem", borderTop: "1px solid var(--border-light)", marginTop: "0.375rem" }}><span>Total Payable</span><span>₹{total.toLocaleString("en-IN")}</span></div>
           </div>
 
           <div style={{ padding: "1rem 1.25rem" }}>
+            {/* Policy Consent Checkbox */}
+            <div style={{ marginBottom: "0.875rem" }}>
+              <label style={{ display: "flex", alignItems: "flex-start", gap: "0.5rem", fontSize: "0.75rem", color: "var(--text-secondary)", cursor: "pointer", lineHeight: 1.45 }}>
+                <input
+                  type="checkbox"
+                  checked={policyAgreed}
+                  onChange={(e) => setPolicyAgreed(e.target.checked)}
+                  style={{ marginTop: "2px", accentColor: "var(--primary)", flexShrink: 0 }}
+                />
+                <span>
+                  I have read and agree to the{" "}
+                  <Link href="/terms" target="_blank" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}>Terms &amp; Conditions</Link>{" "}
+                  and acknowledge the{" "}
+                  <Link href="/refund-policy" target="_blank" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}>Refund Policy</Link>{" "}
+                  and{" "}
+                  <Link href="/privacy-policy" target="_blank" style={{ color: "var(--primary)", fontWeight: 600, textDecoration: "underline" }}>Privacy Policy</Link>.
+                </span>
+              </label>
+            </div>
+
             <button
-              id="razorpay-pay-button"
+              id="cashfree-pay-button"
               type="button"
               onClick={handlePayNow}
-              disabled={submitting || !verifiedEmail}
+              disabled={submitting || !verifiedEmail || !policyAgreed}
               className="btn btn-primary"
-              style={{ width: "100%", justifyContent: "center", opacity: (submitting || !verifiedEmail) ? 0.7 : 1, cursor: (submitting || !verifiedEmail) ? "not-allowed" : "pointer" }}
+              style={{ width: "100%", justifyContent: "center", opacity: (submitting || !verifiedEmail || !policyAgreed) ? 0.7 : 1, cursor: (submitting || !verifiedEmail || !policyAgreed) ? "not-allowed" : "pointer" }}
             >
               {submitting ? (
                 <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ animation: "spin 1s linear infinite" }} aria-hidden="true"><path d="M21 12a9 9 0 11-6.219-8.56" /></svg>Processing...</>
               ) : !verifiedEmail ? (
                 <><Mail size={14} />Verify Email to Continue</>
+              ) : !policyAgreed ? (
+                <><Lock size={14} />Accept Terms to Pay</>
               ) : (
                 <><Lock size={14} />Pay ₹{total.toLocaleString("en-IN")} Securely</>
               )}
@@ -558,7 +531,11 @@ function PaymentForm({ planKey }: { planKey: PlanKey }) {
             )}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "0.375rem", marginTop: "0.75rem" }}>
               <Shield size={12} style={{ color: "var(--success)" }} />
-              <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>Powered by Razorpay · 256-bit SSL encrypted</span>
+              <span style={{ fontSize: "0.6875rem", color: "var(--text-muted)" }}>Powered by Cashfree · 256-bit SSL encrypted</span>
+            </div>
+            <div style={{ marginTop: "0.75rem", textAlign: "center", fontSize: "0.6875rem", color: "var(--text-muted)", lineHeight: 1.4 }}>
+              Digital membership service · Instant activation on payment ·{" "}
+              <Link href="/contact" target="_blank" style={{ color: "var(--primary)", textDecoration: "underline" }}>Customer Support</Link>
             </div>
           </div>
         </div>
@@ -586,14 +563,22 @@ function PaymentPageInner() {
   const plan = PLAN_CONFIG[validPlan];
   return (
     <main style={{ background: "var(--bg-page)", minHeight: "calc(100vh - 120px)", padding: "2rem 0" }}>
-      <div className="container">
+      <div className="container" style={{ maxWidth: "1080px", margin: "0 auto", padding: "0 1rem" }}>
         <div style={{ marginBottom: "1.75rem" }}>
-          <BackButton label="Back to Plans" style={{ marginBottom: "0.875rem", padding: 0 }} />
-          <div style={{ display: "flex", alignItems: "center", gap: "0.75rem" }}>
-            <h1 style={{ fontSize: "1.375rem", fontWeight: 800, color: "var(--text-dark)", margin: 0 }}>Complete Your {plan.name} Purchase</h1>
-            <div style={{ padding: "0.25rem 0.75rem", borderRadius: "var(--radius-full)", background: "var(--primary-light)", color: "var(--primary)", fontSize: "0.75rem", fontWeight: 700 }}>{plan.period}</div>
+          <div style={{ marginBottom: "1rem" }}>
+            <BackButton label="Back to Plans" href="/membership" />
           </div>
-          <p style={{ color: "var(--text-medium)", fontSize: "0.875rem", marginTop: "0.25rem" }}>{plan.description}</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "0.75rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.75rem", flexWrap: "wrap" }}>
+              <h1 style={{ fontSize: "clamp(1.25rem, 2.5vw, 1.625rem)", fontWeight: 800, color: "var(--text-dark)", margin: 0, lineHeight: 1.3 }}>
+                Complete Your {plan.name} Purchase
+              </h1>
+              <span style={{ display: "inline-flex", alignItems: "center", padding: "0.25rem 0.75rem", borderRadius: "var(--radius-full)", background: "var(--primary-light)", color: "var(--primary)", fontSize: "0.75rem", fontWeight: 700, whiteSpace: "nowrap" }}>
+                {plan.period}
+              </span>
+            </div>
+          </div>
+          <p style={{ color: "var(--text-medium)", fontSize: "0.875rem", marginTop: "0.375rem", marginBottom: 0 }}>{plan.description}</p>
         </div>
         <PaymentForm planKey={validPlan} />
       </div>
@@ -611,7 +596,10 @@ export default function PaymentPage() {
       <CompactFooter />
       <style>{`
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        @media (max-width: 768px) { .payment-grid { grid-template-columns: 1fr !important; } }
+        @media (max-width: 860px) {
+          .payment-grid { grid-template-columns: 1fr !important; }
+          .payment-sidebar { position: static !important; }
+        }
       `}</style>
     </>
   );

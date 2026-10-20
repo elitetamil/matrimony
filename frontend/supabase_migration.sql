@@ -78,6 +78,7 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   verification_status    TEXT DEFAULT 'unsubmitted' CHECK (verification_status IN ('unsubmitted','pending','approved','rejected')),
   verification_document  TEXT,
   admin_notes            TEXT,
+  has_horoscope          BOOLEAN NOT NULL DEFAULT false,
   created_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   last_active            TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -87,6 +88,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS body_type              TEXT,
   ADD COLUMN IF NOT EXISTS time_of_birth          TEXT,
+  ADD COLUMN IF NOT EXISTS partner_gender         TEXT CHECK (partner_gender IN ('male', 'female', 'any')),
+  ADD COLUMN IF NOT EXISTS caste_change_count     INT DEFAULT 0,
   ADD COLUMN IF NOT EXISTS auth_email             TEXT,
   ADD COLUMN IF NOT EXISTS is_premium             BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS membership_plan        TEXT CHECK (membership_plan IN ('Gold','PrimeGold','PrimeTillUMarry','Diamond','Platinum')),
@@ -99,6 +102,7 @@ ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS verification_status    TEXT DEFAULT 'unsubmitted',
   ADD COLUMN IF NOT EXISTS verification_document  TEXT,
   ADD COLUMN IF NOT EXISTS admin_notes            TEXT,
+  ADD COLUMN IF NOT EXISTS has_horoscope          BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS updated_at             TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   ADD COLUMN IF NOT EXISTS last_active            TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
@@ -109,6 +113,7 @@ CREATE INDEX IF NOT EXISTS profiles_city_idx                ON public.profiles(c
 CREATE INDEX IF NOT EXISTS profiles_last_active_idx         ON public.profiles(last_active DESC);
 CREATE INDEX IF NOT EXISTS profiles_mobile_idx              ON public.profiles(mobile);
 CREATE INDEX IF NOT EXISTS profiles_is_premium_idx          ON public.profiles(is_premium);
+CREATE INDEX IF NOT EXISTS idx_profiles_has_horoscope       ON public.profiles(has_horoscope);
 CREATE INDEX IF NOT EXISTS idx_profiles_is_banned          ON public.profiles(is_banned);
 CREATE INDEX IF NOT EXISTS idx_profiles_verification_status ON public.profiles(verification_status);
 CREATE INDEX IF NOT EXISTS idx_profiles_membership_plan    ON public.profiles(membership_plan);
@@ -313,7 +318,58 @@ CREATE TABLE IF NOT EXISTS public.horoscopes (
 );
 ALTER TABLE public.horoscopes ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "Owner can manage horoscope" ON public.horoscopes;
-CREATE POLICY "Owner can manage horoscope" ON public.horoscopes FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+CREATE POLICY "Owner can manage horoscope" ON public.horoscopes FOR ALL TO authenticated USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+
+-- One-time backfill based on existing rows
+UPDATE public.profiles p
+SET has_horoscope = EXISTS (
+  SELECT 1 FROM public.horoscopes h WHERE h.user_id = p.id
+);
+
+-- Trigger function to keep profiles.has_horoscope in sync
+CREATE OR REPLACE FUNCTION public.sync_profile_has_horoscope()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    UPDATE public.profiles
+    SET has_horoscope = EXISTS (SELECT 1 FROM public.horoscopes WHERE user_id = NEW.user_id)
+    WHERE id = NEW.user_id;
+    RETURN NEW;
+  ELSIF TG_OP = 'DELETE' THEN
+    UPDATE public.profiles
+    SET has_horoscope = EXISTS (SELECT 1 FROM public.horoscopes WHERE user_id = OLD.user_id)
+    WHERE id = OLD.user_id;
+    RETURN OLD;
+  ELSIF TG_OP = 'UPDATE' THEN
+    IF OLD.user_id IS DISTINCT FROM NEW.user_id THEN
+      UPDATE public.profiles
+      SET has_horoscope = EXISTS (SELECT 1 FROM public.horoscopes WHERE user_id = OLD.user_id)
+      WHERE id = OLD.user_id;
+      UPDATE public.profiles
+      SET has_horoscope = EXISTS (SELECT 1 FROM public.horoscopes WHERE user_id = NEW.user_id)
+      WHERE id = NEW.user_id;
+    ELSE
+      UPDATE public.profiles
+      SET has_horoscope = EXISTS (SELECT 1 FROM public.horoscopes WHERE user_id = NEW.user_id)
+      WHERE id = NEW.user_id;
+    END IF;
+    RETURN NEW;
+  END IF;
+  RETURN NULL;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS trg_sync_profile_has_horoscope ON public.horoscopes;
+CREATE TRIGGER trg_sync_profile_has_horoscope
+  AFTER INSERT OR UPDATE OR DELETE ON public.horoscopes
+  FOR EACH ROW EXECUTE FUNCTION public.sync_profile_has_horoscope();
+
+REVOKE EXECUTE ON FUNCTION public.sync_profile_has_horoscope() FROM PUBLIC;
+GRANT EXECUTE ON FUNCTION public.sync_profile_has_horoscope() TO authenticated, service_role;
 
 
 -- ── 9. VERIFICATION REQUESTS ─────────────────────────────────────────
@@ -428,6 +484,101 @@ DROP POLICY IF EXISTS "Service role inserts transactions" ON public.membership_t
 CREATE POLICY "Users view own transactions"     ON public.membership_transactions FOR SELECT USING (profile_id = auth.uid());
 CREATE POLICY "Service role inserts transactions" ON public.membership_transactions FOR INSERT WITH CHECK (TRUE);
 
+ALTER TABLE public.membership_transactions ADD COLUMN IF NOT EXISTS payment_id TEXT;
+ALTER TABLE public.membership_transactions ADD COLUMN IF NOT EXISTS order_id TEXT;
+ALTER TABLE public.membership_transactions ADD COLUMN IF NOT EXISTS gateway TEXT DEFAULT 'cashfree';
+
+-- Payments audit table (for webhook and order verification tracking)
+CREATE TABLE IF NOT EXISTS public.payments (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  order_id       TEXT UNIQUE NOT NULL,
+  user_id        UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  gateway        TEXT NOT NULL DEFAULT 'cashfree',
+  payment_id     TEXT,
+  plan_key       TEXT NOT NULL,
+  amount         NUMERIC(10, 2) NOT NULL,
+  currency       TEXT NOT NULL DEFAULT 'INR',
+  status         TEXT NOT NULL DEFAULT 'pending',
+  payment_method TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS idx_payments_order_id ON public.payments(order_id);
+CREATE INDEX IF NOT EXISTS idx_payments_user_id ON public.payments(user_id);
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Users view own payments" ON public.payments;
+DROP POLICY IF EXISTS "Service role manages payments" ON public.payments;
+CREATE POLICY "Users view own payments" ON public.payments FOR SELECT USING (user_id = auth.uid());
+CREATE POLICY "Service role manages payments" ON public.payments FOR ALL WITH CHECK (TRUE);
+
+-- Atomic stored procedure for race-free membership activation
+CREATE OR REPLACE FUNCTION public.activate_membership_payment(
+  p_order_id TEXT,
+  p_user_id UUID,
+  p_plan_key TEXT,
+  p_payment_id TEXT,
+  p_amount NUMERIC,
+  p_gateway TEXT DEFAULT 'cashfree',
+  p_payment_method TEXT DEFAULT 'CASHFREE',
+  p_plan_months INT DEFAULT 3,
+  p_plan_period TEXT DEFAULT '3 months'
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  v_payment RECORD;
+  v_profile RECORD;
+  v_now TIMESTAMPTZ := NOW();
+  v_new_expiry TIMESTAMPTZ;
+BEGIN
+  SELECT * INTO v_payment FROM public.payments WHERE order_id = p_order_id FOR UPDATE;
+
+  IF NOT FOUND THEN
+    INSERT INTO public.payments (
+      order_id, user_id, gateway, payment_id, plan_key, amount, currency, status, payment_method, created_at, updated_at
+    ) VALUES (
+      p_order_id, p_user_id, p_gateway, p_payment_id, p_plan_key, p_amount, 'INR', 'processing', p_payment_method, v_now, v_now
+    ) RETURNING * INTO v_payment;
+  ELSIF v_payment.status = 'success' THEN
+    RETURN jsonb_build_object('success', TRUE, 'already_active', TRUE, 'order_id', p_order_id, 'user_id', v_payment.user_id, 'plan_key', v_payment.plan_key);
+  ELSE
+    UPDATE public.payments
+    SET status = 'processing', user_id = COALESCE(user_id, p_user_id), payment_id = COALESCE(p_payment_id, payment_id), updated_at = v_now
+    WHERE order_id = p_order_id;
+  END IF;
+
+  SELECT * INTO v_profile FROM public.profiles WHERE id = p_user_id FOR UPDATE;
+  IF NOT FOUND THEN
+    UPDATE public.payments SET status = 'failed', updated_at = v_now WHERE order_id = p_order_id;
+    RETURN jsonb_build_object('success', FALSE, 'error', 'User profile not found');
+  END IF;
+
+  IF v_profile.membership_expiry IS NOT NULL AND v_profile.membership_expiry > v_now THEN
+    v_new_expiry := v_profile.membership_expiry + (p_plan_months || ' months')::INTERVAL;
+  ELSE
+    v_new_expiry := v_now + (p_plan_months || ' months')::INTERVAL;
+  END IF;
+
+  UPDATE public.profiles
+  SET is_premium = TRUE, membership_plan = p_plan_key, membership_expiry = v_new_expiry, membership_activated = v_now, membership_price_paid = ROUND(p_amount), membership_plan_period = p_plan_period, updated_at = v_now
+  WHERE id = p_user_id;
+
+  INSERT INTO public.membership_transactions (
+    profile_id, plan, payment_id, order_id, gateway, razorpay_payment_id, amount_paid_inr, plan_period, activated_at, expires_at, created_at
+  ) VALUES (
+    p_user_id, p_plan_key, p_payment_id, p_order_id, p_gateway, p_payment_id, ROUND(p_amount), p_plan_period, v_now, v_new_expiry, v_now
+  );
+
+  UPDATE public.payments
+  SET status = 'success', payment_id = p_payment_id, payment_method = p_payment_method, amount = p_amount, updated_at = v_now
+  WHERE order_id = p_order_id;
+
+  RETURN jsonb_build_object('success', TRUE, 'already_active', FALSE, 'activated', TRUE, 'order_id', p_order_id, 'user_id', p_user_id, 'plan_key', p_plan_key, 'expiry', v_new_expiry, 'plan_period', p_plan_period);
+END;
+$$;
+
 
 -- ── 14. STORAGE BUCKETS & POLICIES ───────────────────────────────────
 INSERT INTO storage.buckets (id, name, public) VALUES ('profile-photos', 'profile-photos', true) ON CONFLICT (id) DO NOTHING;
@@ -443,6 +594,49 @@ CREATE POLICY "Auth users delete own profile photos" ON storage.objects FOR DELE
 INSERT INTO storage.buckets (id, name, public) VALUES ('verification-documents', 'verification-documents', false) ON CONFLICT (id) DO NOTHING;
 DROP POLICY IF EXISTS "Owners access own verification docs" ON storage.objects;
 CREATE POLICY "Owners access own verification docs" ON storage.objects FOR ALL USING (bucket_id = 'verification-documents' AND auth.uid()::TEXT = (storage.foldername(name))[1]) WITH CHECK (bucket_id = 'verification-documents' AND auth.uid()::TEXT = (storage.foldername(name))[1]);
+
+-- Private Horoscopes Storage Bucket (strictly private, public = false)
+INSERT INTO storage.buckets (id, name, public) VALUES ('horoscopes', 'horoscopes', false) ON CONFLICT (id) DO UPDATE SET public = false;
+DROP POLICY IF EXISTS "Auth users upload own horoscope" ON storage.objects;
+DROP POLICY IF EXISTS "Auth users update own horoscope" ON storage.objects;
+DROP POLICY IF EXISTS "Auth users read own horoscope"   ON storage.objects;
+DROP POLICY IF EXISTS "Auth users delete own horoscope" ON storage.objects;
+
+CREATE POLICY "Auth users upload own horoscope" ON storage.objects
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    bucket_id = 'horoscopes'
+    AND auth.uid()::TEXT = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Auth users update own horoscope" ON storage.objects
+  FOR UPDATE
+  TO authenticated
+  USING (
+    bucket_id = 'horoscopes'
+    AND auth.uid()::TEXT = (storage.foldername(name))[1]
+  )
+  WITH CHECK (
+    bucket_id = 'horoscopes'
+    AND auth.uid()::TEXT = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Auth users read own horoscope" ON storage.objects
+  FOR SELECT
+  TO authenticated
+  USING (
+    bucket_id = 'horoscopes'
+    AND auth.uid()::TEXT = (storage.foldername(name))[1]
+  );
+
+CREATE POLICY "Auth users delete own horoscope" ON storage.objects
+  FOR DELETE
+  TO authenticated
+  USING (
+    bucket_id = 'horoscopes'
+    AND auth.uid()::TEXT = (storage.foldername(name))[1]
+  );
 
 -- Success Stories Buckets (public read, service role / admin write)
 INSERT INTO storage.buckets (id, name, public) VALUES ('success stories', 'success stories', true) ON CONFLICT (id) DO NOTHING;

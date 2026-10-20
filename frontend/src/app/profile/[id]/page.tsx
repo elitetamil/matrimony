@@ -95,7 +95,7 @@ function InfoRow({
   editSection,
 }: {
   label: string;
-  value?: string | null;
+  value?: string | null | React.ReactNode;
   addLink?: boolean;
   isOwnProfile?: boolean;
   /** The ?section= param to jump to in /profile/edit when "Add" is clicked */
@@ -541,6 +541,44 @@ function ProfileDetailPage({
 
   const [hasRevealedContact, setHasRevealedContact] = useState(false);
   const [revealsUsed, setRevealsUsed] = useState(0);
+
+  const handleViewMemberHoroscope = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!user) {
+      router.push(`/login?redirect=/profile/${id}`);
+      return;
+    }
+    const toastId = toast.loading("Accessing horoscope...");
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) {
+        toast.error("Please log in to view horoscope", { id: toastId });
+        return;
+      }
+      const res = await fetch(`/api/horoscope/signed-url?targetUserId=${id}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        if (data.code === "PREMIUM_REQUIRED") {
+          toast.error("Upgrade to Gold or higher plan to view horoscopes.", { id: toastId });
+          router.push("/membership");
+        } else {
+          toast.error(data.error || "Failed to load horoscope.", { id: toastId });
+        }
+        return;
+      }
+      toast.dismiss(toastId);
+      if (data.signedUrl) {
+        window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+      }
+    } catch {
+      toast.error("Failed to load horoscope.", { id: toastId });
+    }
+  };
 
   useEffect(() => {
     if (!user) return;
@@ -1091,7 +1129,7 @@ function ProfileDetailPage({
                     <div style={{ flex: "1", minWidth: "250px", background: "#fff", borderRadius: "var(--radius-xl)", border: "1px solid var(--border-color)", padding: "1.5rem", boxShadow: "var(--shadow-sm)", display: "flex", flexDirection: "column" }}>
                       <h3 style={{ fontSize: "1rem", fontWeight: 700, color: "var(--primary)", marginBottom: "0.75rem", marginTop: 0 }}>About Me</h3>
                       <p style={{ fontSize: "0.8125rem", color: "var(--text-medium)", lineHeight: 1.6, margin: 0 }}>
-                        My {profile.gender === "female" ? "friend" : "son"} has completed {profile.education || "Bachelor's degree"}. Currently {profile.occupation === "Not Working" ? "not working" : `working as ${profile.occupation}`} and lives in {profile.location || "Chennai"}. Looking for a partner who shares similar values and dreams.
+                        {p.about || `My ${profile.gender === "female" ? "friend" : "son"} has completed ${profile.education || "Bachelor's degree"}. Currently ${profile.occupation === "Not Working" ? "not working" : `working as ${profile.occupation}`} and lives in ${profile.location || "Chennai"}. Looking for a partner who shares similar values and dreams.`}
                       </p>
                     </div>
                   </div>
@@ -1368,12 +1406,7 @@ function ProfileDetailPage({
                     About Me
                   </h3>
                   <p style={{ fontSize: "0.875rem", color: "var(--text-medium)", lineHeight: 1.65 }}>
-                    My {profile.gender === "female" ? "friend" : "son"} has completed{" "}
-                    {profile.education || "Bachelor's degree"}. Currently{" "}
-                    {profile.occupation === "Not Working"
-                      ? "not working"
-                      : `working as ${profile.occupation}`}{" "}
-                    and lives in {profile.location || "Chennai"}.
+                    {p.about || `My ${profile.gender === "female" ? "friend" : "son"} has completed ${profile.education || "Bachelor's degree"}. Currently ${profile.occupation === "Not Working" ? "not working" : `working as ${profile.occupation}`} and lives in ${profile.location || "Chennai"}.`}
                   </p>
                 </div>
 
@@ -1382,7 +1415,7 @@ function ProfileDetailPage({
                   {/* Left column */}
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <tbody>
-                      <InfoRow label="Profile created for" value={profile.gender === "female" ? "Friend" : "Son"} />
+                      <InfoRow label="Profile created for" value={p.profileFor || (profile.gender === "female" ? "Friend" : "Son")} />
                       <InfoRow label="Body Type" value={p.bodyType || undefined} addLink isOwnProfile={isOwnProfile} editSection="lifestyle" />
                       <InfoRow label="Physical Status" value={p.physicalStatus || "Normal"} />
                       <InfoRow label="Weight" value={p.weight ? `${p.weight} kg` : undefined} addLink isOwnProfile={isOwnProfile} editSection="basic" />
@@ -1441,6 +1474,35 @@ function ProfileDetailPage({
                       <InfoRow label="Star (Nakshatra)" value={p.star || undefined} addLink isOwnProfile={isOwnProfile} />
                       <InfoRow label="Raasi (Moon Sign)" value={p.rasi || undefined} addLink isOwnProfile={isOwnProfile} />
                       <InfoRow label="Dhosham" value={p.dhosham || undefined} />
+                      <InfoRow
+                        label="Horoscope"
+                        value={
+                          (p.hasHoroscope || p.horoscope) ? (
+                            <button
+                              type="button"
+                              onClick={handleViewMemberHoroscope}
+                              style={{
+                                background: "none",
+                                border: "none",
+                                padding: 0,
+                                color: "var(--primary)",
+                                fontWeight: 600,
+                                cursor: "pointer",
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "4px",
+                                fontFamily: "var(--font-sans)",
+                                fontSize: "0.8125rem",
+                              }}
+                            >
+                              Available (View Horoscope ↗)
+                            </button>
+                          ) : undefined
+                        }
+                        addLink
+                        isOwnProfile={isOwnProfile}
+                        editSection="religion"
+                      />
                     </tbody>
                   </table>
                   {/* Right: Horoscope birth details */}

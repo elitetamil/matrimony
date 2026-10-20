@@ -18,6 +18,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 
 export const PROFILE_PHOTOS_BUCKET = 'profile-photos';
 export const VERIFICATION_DOCS_BUCKET = 'verification-documents';
+export const HOROSCOPES_BUCKET = 'horoscopes';
 
 /**
  * Get the public URL for a profile photo.
@@ -68,26 +69,130 @@ export async function deleteProfilePhoto(
 }
 
 /**
- * Upload a horoscope document (PDF/JPG/PNG) to Supabase Storage.
+ * Upload a horoscope document (PDF/JPG/PNG) to the PRIVATE Supabase Storage bucket.
+ * Stores file at `<userId>/<unique-filename>`.
  */
 export async function uploadHoroscopeFile(
   userId: string,
   file: File
-): Promise<{ url: string; fileName: string }> {
+): Promise<{ path: string; signedUrl: string; fileName: string; url: string }> {
+  if (file.size > 5 * 1024 * 1024) {
+    throw new Error('Horoscope file size must be less than 5 MB.');
+  }
+
   const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const allowedExts = ['jpg', 'jpeg', 'png', 'pdf'];
+  if (!allowedExts.includes(ext)) {
+    throw new Error('Invalid file format. Allowed formats: PDF, JPG, JPEG, PNG.');
+  }
+
   const filename = `horoscope_${Date.now()}.${ext}`;
-  const path = `horoscopes/${userId}/${filename}`;
+  const path = `${userId}/${filename}`;
+  const contentType = file.type || (ext === 'pdf' ? 'application/pdf' : ext === 'png' ? 'image/png' : 'image/jpeg');
 
   const { error } = await supabase.storage
-    .from(PROFILE_PHOTOS_BUCKET)
+    .from(HOROSCOPES_BUCKET)
     .upload(path, file, {
-      contentType: file.type || (ext === 'pdf' ? 'application/pdf' : 'image/jpeg'),
+      contentType,
       upsert: true,
     });
 
   if (error) throw new Error(`Horoscope upload failed: ${error.message}`);
-  const { data } = supabase.storage.from(PROFILE_PHOTOS_BUCKET).getPublicUrl(path);
-  return { url: data.publicUrl, fileName: file.name };
+
+  // Generate an initial signed URL for immediate preview (valid for 24 hours)
+  const { data: signedData, error: signedError } = await supabase.storage
+    .from(HOROSCOPES_BUCKET)
+    .createSignedUrl(path, 86400);
+
+  if (signedError || !signedData?.signedUrl) {
+    throw new Error(`Failed to generate signed URL for horoscope: ${signedError?.message}`);
+  }
+
+  return {
+    path,
+    signedUrl: signedData.signedUrl,
+    url: signedData.signedUrl,
+    fileName: file.name,
+  };
+}
+
+/**
+ * Generate a fresh signed URL for a private horoscope document.
+ * Backward compatible with any legacy horoscope files stored in profile-photos.
+ */
+export async function getHoroscopeSignedUrl(
+  pathOrUrl: string,
+  expiresInSeconds = 3600
+): Promise<string> {
+  if (!pathOrUrl) return '';
+
+  // Backward compatibility: If the file was previously in public profile-photos, return the public URL
+  if (pathOrUrl.includes(`/${PROFILE_PHOTOS_BUCKET}/`)) {
+    return pathOrUrl;
+  }
+
+  // Extract relative storage path e.g. "userId/horoscope_123.pdf"
+  let cleanPath = pathOrUrl;
+  if (cleanPath.includes(`/${HOROSCOPES_BUCKET}/`)) {
+    cleanPath = cleanPath.split(`/${HOROSCOPES_BUCKET}/`)[1];
+  }
+
+  const { data, error } = await supabase.storage
+    .from(HOROSCOPES_BUCKET)
+    .createSignedUrl(cleanPath, expiresInSeconds);
+
+  if (error) {
+    console.warn('[getHoroscopeSignedUrl] Error creating signed URL:', error.message);
+    throw new Error(`Signed URL generation failed: ${error.message}`);
+  }
+
+  return data.signedUrl;
+}
+
+/**
+ * Delete a horoscope document from Supabase Storage.
+ * Safe guards ensure profile photos (avatars) are never deleted.
+ */
+export async function deleteHoroscopeFile(
+  userId: string,
+  fileUrlOrPath: string
+): Promise<void> {
+  if (!fileUrlOrPath) return;
+
+  // Safety safeguard: Never delete an avatar/profile photo
+  if (fileUrlOrPath.includes('avatar_')) {
+    console.warn('[deleteHoroscopeFile] Blocked attempt to delete an avatar file.');
+    return;
+  }
+
+  // Handle legacy files in profile-photos bucket if explicitly referenced
+  if (fileUrlOrPath.includes(`${PROFILE_PHOTOS_BUCKET}/`)) {
+    const legacyPath = fileUrlOrPath.split(`${PROFILE_PHOTOS_BUCKET}/`)[1];
+    if (legacyPath && legacyPath.includes('horoscope')) {
+      const { error } = await supabase.storage
+        .from(PROFILE_PHOTOS_BUCKET)
+        .remove([legacyPath]);
+      if (error) console.warn('[deleteHoroscopeFile] Legacy delete warning:', error.message);
+    }
+    return;
+  }
+
+  // Standard private horoscopes bucket removal
+  let storagePath = fileUrlOrPath;
+  if (fileUrlOrPath.includes(`${HOROSCOPES_BUCKET}/`)) {
+    storagePath = fileUrlOrPath.split(`${HOROSCOPES_BUCKET}/`)[1];
+  } else if (!fileUrlOrPath.startsWith(`${userId}/`)) {
+    const filename = fileUrlOrPath.split('/').pop() || fileUrlOrPath;
+    storagePath = `${userId}/${filename}`;
+  }
+
+  const { error } = await supabase.storage
+    .from(HOROSCOPES_BUCKET)
+    .remove([storagePath]);
+
+  if (error) {
+    console.warn('[deleteHoroscopeFile] Storage horoscope delete warning:', error.message);
+  }
 }
 
 

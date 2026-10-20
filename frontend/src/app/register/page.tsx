@@ -603,7 +603,7 @@ function StepHeader({ step, total, title, onBack }: { step: number; total: numbe
 function RegisterWizard() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { refresh } = useAuth();
+  const { refresh, setUser } = useAuth();
   const msg91 = useMSG91();
 
   // Data passed from homepage form
@@ -961,11 +961,6 @@ function RegisterWizard() {
       return;
     }
     if (!form.password)               { toast.error("Please set a password"); return; }
-    if (!horoscopeFile) {
-      setHoroscopeError("Please upload your horoscope image to complete registration.");
-      toast.error("Please upload your horoscope image to complete registration.");
-      return;
-    }
 
     setIsSubmitting(true);
     try {
@@ -993,7 +988,8 @@ function RegisterWizard() {
         star: form.star,
         rasi: form.rasi,
         dhosham: form.dhosham,
-        about: form.about,
+        about: form.about?.trim() || generateBio(form),
+        languages: form.languages && form.languages.length > 0 ? form.languages : undefined,
         photoUrl: form.photoUrl || undefined,
         // Partner preferences
         partnerGender: form.partnerGender,
@@ -1024,16 +1020,29 @@ function RegisterWizard() {
         }
       }
 
-      // Upload horoscope to Supabase Storage
+      // Upload horoscope to private Supabase Storage if user attached one
       if (horoscopeFile && newUser.id) {
+        let uploadedPath: string | null = null;
         try {
-          const { url, fileName } = await uploadHoroscopeFile(newUser.id, horoscopeFile);
-          await saveHoroscope(newUser.id, url, fileName);
+          const { path, fileName } = await uploadHoroscopeFile(newUser.id, horoscopeFile);
+          uploadedPath = path;
+          await saveHoroscope(newUser.id, path, fileName);
         } catch (horoscopeErr) {
-          console.warn("Horoscope upload failed:", horoscopeErr);
+          console.warn("Horoscope upload or save failed:", horoscopeErr);
+          // Rollback: prevent orphan file in private bucket if database save failed
+          if (uploadedPath) {
+            try {
+              const { deleteHoroscopeFile } = await import("@/lib/supabase");
+              await deleteHoroscopeFile(newUser.id, uploadedPath);
+            } catch {
+              // Ignore rollback cleanup error
+            }
+          }
+          toast.error("Account created, but horoscope upload failed. You can upload it from your profile.");
         }
       }
 
+      setUser(newUser);
       await refresh();
       toast.success("Profile created successfully! Welcome to Elite Tamil Matrimony");
       router.push("/");   // redirect to Home after registration
@@ -2199,14 +2208,14 @@ function RegisterWizard() {
             </div>
 
             <div className="register-card" style={{ background: "#fff", border: "1px solid var(--border-color)", borderRadius: "var(--radius-xl)", padding: "1.75rem" }}>
-              {/* ── MANDATORY HOROSCOPE UPLOAD SECTION ── */}
+              {/* ── OPTIONAL HOROSCOPE UPLOAD SECTION ── */}
               <div style={{ marginBottom: "1.75rem", paddingBottom: "1.5rem", borderBottom: "1px solid var(--border-light)" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "0.625rem" }}>
                   <label style={{ fontWeight: 700, fontSize: "0.9375rem", color: "var(--text-dark)", margin: 0 }}>
-                    Upload Horoscope
+                    Upload Horoscope <span style={{ fontWeight: 400, color: "var(--text-muted)", fontSize: "0.8125rem" }}>(Optional)</span>
                   </label>
                   <span
-                    title="Upload PDF or JPG format of your horoscope (jathagam)"
+                    title="Upload PDF or JPG format of your horoscope (jathagam) - Optional"
                     style={{ cursor: "pointer", color: "#8E8E93", display: "inline-flex", alignItems: "center" }}
                   >
                     <Info size={16} />
@@ -2265,11 +2274,24 @@ function RegisterWizard() {
                 <input
                   id="horoscope-file-input"
                   type="file"
-                  accept="image/*,.pdf"
+                  accept="image/jpeg,image/png,image/jpg,application/pdf,.pdf,.jpg,.jpeg,.png"
                   style={{ display: "none" }}
                   onChange={(e) => {
                     const file = e.target.files?.[0];
                     if (file) {
+                      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'];
+                      const ext = file.name.split('.').pop()?.toLowerCase();
+                      const isValidExt = ['jpg', 'jpeg', 'png', 'pdf'].includes(ext || '');
+                      if (!validTypes.includes(file.type) && !isValidExt) {
+                        setHoroscopeError("Please upload a valid PDF or JPG/PNG image file.");
+                        toast.error("Please upload a valid PDF or JPG/PNG image file.");
+                        return;
+                      }
+                      if (file.size > 5 * 1024 * 1024) {
+                        setHoroscopeError("Horoscope file size must be less than 5MB.");
+                        toast.error("Horoscope file size must be less than 5MB.");
+                        return;
+                      }
                       setHoroscopeFile(file);
                       setHoroscopeFileName(file.name);
                       setHoroscopeError("");
@@ -2281,7 +2303,7 @@ function RegisterWizard() {
                 {horoscopeError && <FieldError msg={horoscopeError} />}
                 {!horoscopeFile && !horoscopeError && (
                   <p style={{ fontSize: "0.75rem", color: "var(--text-muted)", marginTop: "0.375rem", marginBottom: 0 }}>
-                    Registration will be completed only after uploading your horoscope image.
+                    Optional: Upload PDF or JPG of your horoscope (jathagam, max 5MB). You can also add or update this later.
                   </p>
                 )}
               </div>

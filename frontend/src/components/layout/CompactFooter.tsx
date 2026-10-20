@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 
 const SOCIAL_LINKS = [
   {
@@ -94,6 +95,19 @@ export default function CompactFooter() {
             <p style={{ fontSize: "0.75rem", color: "rgba(255,255,255,0.75)", margin: 0, whiteSpace: "nowrap" }}>
               &copy; 2026 Elite Tamil Matrimony. All rights reserved.
             </p>
+
+            <div className="compact-footer-divider" />
+
+            {/* Policy & Support Links */}
+            <div style={{ display: "flex", alignItems: "center", gap: "0.625rem", flexWrap: "wrap", fontSize: "0.75rem" }}>
+              <Link href="/terms" style={{ color: "rgba(255,255,255,0.75)", textDecoration: "none" }}>Terms</Link>
+              <span style={{ color: "rgba(255,255,255,0.35)" }}>·</span>
+              <Link href="/privacy-policy" style={{ color: "rgba(255,255,255,0.75)", textDecoration: "none" }}>Privacy</Link>
+              <span style={{ color: "rgba(255,255,255,0.35)" }}>·</span>
+              <Link href="/refund-policy" style={{ color: "rgba(255,255,255,0.75)", textDecoration: "none" }}>Refund Policy</Link>
+              <span style={{ color: "rgba(255,255,255,0.35)" }}>·</span>
+              <Link href="/contact" style={{ color: "rgba(255,255,255,0.75)", textDecoration: "none" }}>Contact</Link>
+            </div>
 
             <div className="compact-footer-divider" />
 
